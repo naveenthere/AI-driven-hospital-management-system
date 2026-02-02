@@ -15,15 +15,33 @@ let currentPage = 'login';
 let allData = [];
 let userTasks = [];
 
+// Load tasks from API
+async function loadTasks() {
+  try {
+    const response = await fetch('/api/tasks');
+    const data = await response.json();
+    if (data.success) {
+      userTasks = data.tasks;
+      updateTaskBadge();
+    }
+  } catch (error) {
+    console.error('Error loading tasks:', error);
+  }
+}
+
+// Call on load
+document.addEventListener('DOMContentLoaded', loadTasks);
+
+
+
 // ============ USER CREDENTIALS ============
 const users = {
-  'CEO001': { password: 'ceo@123', role: 'CEO', name: 'Dr. Sarah Johnson', access: ['dashboard', 'patients', 'staff', 'transactions', 'predictions', 'inventory', 'records', 'certificates'] },
+  'CEO001': { password: 'ceo@123', role: 'CEO', name: 'Dr. Sarah Johnson', access: ['dashboard', 'patients', 'staff', 'transactions', 'predictions', 'inventory', 'records'] },
   'CFO001': { password: 'cfo@123', role: 'CFO', name: 'Michael Chen', access: ['transactions'] },
   'CNO001': { password: 'cno@123', role: 'CNO', name: 'Emily Davis', access: ['patients', 'staff'] },
   'CMO001': { password: 'cmo@123', role: 'CMO', name: 'Dr. Robert Williams', access: ['inventory'] },
-  'CCO001': { password: 'cco@123', role: 'CCO', name: 'Jennifer Martinez', access: ['certificates'] },
-  'MRM001': { password: 'mrm@123', role: 'MRM', name: 'David Thompson', access: ['records'] },
-  'HR001': { password: 'hr@123', role: 'HR', name: 'Human Resources Manager', access: ['dashboard', 'patients', 'staff', 'transactions', 'predictions', 'inventory', 'records', 'certificates'] }
+  'PRM001': { password: 'prm@123', role: 'PRM', name: 'David Thompson', access: ['records'] },
+  'HR001': { password: 'hr@123', role: 'HR', name: 'Human Resources Manager', access: ['staff', 'dashboard'] }
 };
 
 // ============ SAMPLE DATA ============
@@ -91,11 +109,7 @@ const sampleOrgans = [
   { type: 'Cornea', available: 35, waitlist: 12 }
 ];
 
-const sampleCertificates = [
-  { id: 'CERT001', employeeId: 'STF001', name: 'Dr. Amanda Foster', certificate: 'Board Certified Cardiologist', issueDate: '2020-06-15', expiryDate: '2025-06-15', status: 'Valid' },
-  { id: 'CERT002', employeeId: 'STF002', name: 'Nurse James Wilson', certificate: 'RN License', issueDate: '2019-03-20', expiryDate: '2024-03-20', status: 'Expiring Soon' },
-  { id: 'CERT003', employeeId: 'STF003', name: 'Dr. Lisa Park', certificate: 'Neurology Specialist', issueDate: '2021-08-10', expiryDate: '2026-08-10', status: 'Valid' }
-];
+
 
 const sampleRecords = [
   { id: 'REC001', patientId: 'ADM001', name: 'John Smith', diagnosis: 'Hypertension', treatment: 'Medication', doctor: 'Dr. Amanda Foster', lastVisit: '2024-01-15' },
@@ -294,6 +308,67 @@ async function loadPayroll(month, year) {
   }
 }
 
+// Load blood stock
+async function loadBloodStock() {
+  try {
+    const response = await fetch('/api/inventory/blood');
+    const data = await response.json();
+    return data.success ? data.blood_stock : [];
+  } catch (error) {
+    console.error('Load blood stock error:', error);
+    return [];
+  }
+}
+
+// Load organ stock
+async function loadOrganStock() {
+  try {
+    const response = await fetch('/api/inventory/organs');
+    const data = await response.json();
+    return data.success ? data.organ_stock : [];
+  } catch (error) {
+    console.error('Load organ stock error:', error);
+    return [];
+  }
+}
+
+// Load donors
+async function loadDonors() {
+  try {
+    const response = await fetch('/api/inventory/donors');
+    const data = await response.json();
+    return data.success ? data.donors : [];
+  } catch (error) {
+    console.error('Load donors error:', error);
+    return [];
+  }
+}
+
+// Load medical records
+async function loadMedicalRecords() {
+  try {
+    const response = await fetch('/api/records');
+    const data = await response.json();
+    return data.success ? data.records : [];
+  } catch (error) {
+    console.error('Load medical records error:', error);
+    return [];
+  }
+}
+
+// Load dashboard metrics
+async function loadDashboardMetrics() {
+  try {
+    const response = await fetch('/api/dashboard/metrics');
+    const data = await response.json();
+    return data.success ? data.metrics : null;
+  } catch (error) {
+    console.error('Load dashboard metrics error:', error);
+    return null;
+  }
+}
+
+
 // ============ RENDER FUNCTIONS ============
 function render() {
   const app = document.getElementById('app');
@@ -406,8 +481,7 @@ function renderMainLayout() {
     { id: 'transactions', icon: '💰', label: 'Transactions', page: 'transactions' },
     { id: 'predictions', icon: '📈', label: 'Predictions', page: 'predictions' },
     { id: 'inventory', icon: '🩸', label: 'Blood & Organs', page: 'inventory' },
-    { id: 'records', icon: '📋', label: 'Medical Records', page: 'records' },
-    { id: 'certificates', icon: '📜', label: 'Certificates', page: 'certificates' }
+    { id: 'records', icon: '📋', label: 'Medical Records', page: 'records' }
   ];
 
   return `
@@ -496,8 +570,7 @@ function renderCurrentPage() {
     transactions: 'Transaction & Payroll Management',
     predictions: 'Admission Prediction & Anomaly Detection',
     inventory: 'Organ & Blood Stock Management',
-    records: 'Medical Records',
-    certificates: 'Employee Certificates'
+    records: 'Medical Records'
   };
 
   title.textContent = pageTitles[currentPage] || 'Dashboard';
@@ -524,7 +597,6 @@ function renderCurrentPage() {
     case 'predictions': renderPredictions(content); break;
     case 'inventory': renderInventory(content); break;
     case 'records': renderRecords(content); break;
-    case 'certificates': renderCertificates(content); break;
     default: renderDashboard(content);
   }
 }
@@ -1166,7 +1238,10 @@ async function renderStaff(container) {
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <!-- Staff Table -->
           <div class="glass rounded-xl p-6">
-            <h3 class="text-lg font-semibold text-white mb-4">Staff Allocation</h3>
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-white">Staff Allocation</h3>
+              <button id="add-staff-btn" class="px-3 py-1 btn-primary rounded-lg text-sm">+ Hire Staff</button>
+            </div>
             <div class="table-container">
               <table class="w-full">
                 <thead class="sticky top-0 bg-slate-800">
@@ -1175,7 +1250,8 @@ async function renderStaff(container) {
                     <th class="pb-3 pr-4">Name</th>
                     <th class="pb-3 pr-4">Department</th>
                     <th class="pb-3 pr-4">Shift</th>
-                    <th class="pb-3">Status</th>
+                    <th class="pb-3 pr-4">Status</th>
+                    <th class="pb-3">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1186,11 +1262,14 @@ async function renderStaff(container) {
                       <td class="py-3 pr-4 text-gray-300">${s.department}</td>
                       <td class="py-3 pr-4 text-gray-300">${s.shift}</td>
                       </td>
-                      <td class="py-3">
+                      <td class="py-3 pr-4">
                         <select class="staff-status-select px-3 py-1 rounded-lg bg-slate-700 text-sm border-none ${s.status === 'Present' ? 'text-green-400' : 'text-yellow-400'}" data-id="${s.id}">
                           <option value="Present" ${s.status === 'Present' ? 'selected' : ''} class="text-green-400">Present</option>
                           <option value="Leave" ${s.status === 'Leave' ? 'selected' : ''} class="text-yellow-400">Leave</option>
                         </select>
+                      </td>
+                      <td class="py-3">
+                        <button class="delete-staff-btn text-red-400 hover:text-red-300 transition-colors" data-id="${s.id}" title="Delete Staff">🗑️</button>
                       </td>
                     </tr>
                   `).join('')}
@@ -1234,7 +1313,89 @@ async function renderStaff(container) {
             </div>
           </div>
         </div>
+        </div>
+
+        <!-- Add Staff Modal -->
+        <div id="add-staff-modal" class="fixed inset-0 z-50 hidden">
+           <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+           <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md">
+             <div class="glass rounded-xl p-6 border border-slate-700 shadow-xl">
+               <h3 class="text-xl font-bold text-white mb-4">Hire New Staff</h3>
+               <form id="add-staff-form" class="space-y-4">
+                 <input type="text" id="staff-name" placeholder="Full Name" required class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white">
+                 <select id="staff-dept" required class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white">
+                   <option value="">Select Department</option>
+                   <option value="Cardiology">Cardiology</option>
+                   <option value="Neurology">Neurology</option>
+                   <option value="Surgery">Surgery</option>
+                   <option value="Pediatrics">Pediatrics</option>
+                   <option value="General">General</option>
+                 </select>
+                 <select id="staff-role" required class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white">
+                   <option value="Doctor">Doctor</option>
+                   <option value="Nurse">Nurse</option>
+                   <option value="Technician">Technician</option>
+                   <option value="Support">Support</option>
+                 </select>
+                 <select id="staff-shift" class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white">
+                   <option value="Day">Day Shift</option>
+                   <option value="Night">Night Shift</option>
+                 </select>
+                 <div class="flex justify-end space-x-3 mt-6">
+                   <button type="button" id="cancel-staff-btn" class="px-4 py-2 text-gray-400 hover:text-white">Cancel</button>
+                   <button type="submit" class="px-4 py-2 btn-primary rounded-lg text-white font-medium">Hire</button>
+                 </div>
+               </form>
+             </div>
+           </div>
+        </div>
       `;
+
+  // Add Staff Modal Logic
+  document.getElementById('add-staff-btn')?.addEventListener('click', () => {
+    document.getElementById('add-staff-modal').classList.remove('hidden');
+  });
+  document.getElementById('cancel-staff-btn')?.addEventListener('click', () => {
+    document.getElementById('add-staff-modal').classList.add('hidden');
+  });
+  document.getElementById('add-staff-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = {
+      name: document.getElementById('staff-name').value,
+      department: document.getElementById('staff-dept').value,
+      role: document.getElementById('staff-role').value,
+      shift: document.getElementById('staff-shift').value
+    };
+    try {
+      const res = await fetch('/api/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        showToast('Staff hired successfully');
+        document.getElementById('add-staff-modal').classList.add('hidden');
+        renderStaff(container);
+      } else {
+        showToast('Failed to hire staff', 'error');
+      }
+    } catch (err) { console.error(err); }
+  });
+
+  // Delete Staff Logic
+  document.querySelectorAll('.delete-staff-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      if (!confirm('Are you sure you want to terminate this employee?')) return;
+      const id = e.target.closest('button').dataset.id;
+      try {
+        const res = await fetch(`/api/staff/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          showToast('Staff terminated');
+          renderStaff(container);
+        }
+      } catch (err) { console.error(err); }
+    });
+  });
 
   // Add staff status change handler
   document.querySelectorAll('.staff-status-select').forEach(select => {
@@ -1961,17 +2122,49 @@ function renderPredictions(container) {
   }, 100);
 }
 
-function renderInventory(container) {
+async function renderInventory(container) {
+  // Show loading state
+  container.innerHTML = `
+    <div class="flex items-center justify-center h-full">
+      <div class="text-center">
+        <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
+        <p class="text-gray-400">Loading inventory data...</p>
+      </div>
+    </div>
+  `;
+
+  const [bloodStock, organStock, donors] = await Promise.all([
+    loadBloodStock(),
+    loadOrganStock(),
+    loadDonors()
+  ]);
+
+  // Use API data or fallback
+  const displayBlood = bloodStock.length > 0 ? bloodStock : sampleBloodStock;
+  const displayOrgans = organStock.length > 0 ? organStock : sampleOrgans;
+  // Donors logic: API data or fallbacks
+  // If API returns data, use it. If not, and fallback is needed, map samples.
+  // Sample data: James Anderson, Maria Garcia, Robert Kim.
+  // We'll use API data primarily.
+  const displayDonors = donors.length > 0 ? donors : [
+    { name: 'James Anderson', blood_group: 'O+', contact: '555-0201', address: '123 Oak Street', last_donation: '2024-01-10', status: 'Eligible', donation_type: 'Blood' },
+    { name: 'Maria Garcia', blood_group: 'A-', contact: '555-0202', address: '456 Pine Avenue', last_donation: '2023-12-28', status: 'Waiting', donation_type: 'Blood' },
+    { name: 'Robert Kim', blood_group: 'B+', contact: '555-0203', address: '789 Elm Road', last_donation: '2024-01-05', status: 'Eligible', donation_type: 'Blood' }
+  ];
+
   container.innerHTML = `
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <!-- Blood Stock -->
           <div class="glass rounded-xl p-6">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-lg font-semibold text-white">🩸 Blood Stock Inventory</h3>
-              <button class="px-4 py-2 btn-primary rounded-lg text-sm font-medium">+ Add Donor</button>
+              <div>
+                <button id="consume-stock-btn" class="mr-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium">Capture Usage</button>
+                <button id="add-blood-donor-btn" class="px-4 py-2 btn-primary rounded-lg text-sm font-medium">+ Add Donor</button>
+              </div>
             </div>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-              ${sampleBloodStock.map(b => `
+              ${displayBlood.map(b => `
                 <div class="p-4 bg-slate-800 rounded-lg text-center ${b.units < 25 ? 'border-2 border-red-500 pulse-alert' : ''}">
                   <p class="text-2xl font-bold text-white">${b.type}</p>
                   <p class="text-3xl font-bold ${b.units < 25 ? 'text-red-500' : 'text-green-400'} mt-2">${b.units}</p>
@@ -1987,10 +2180,10 @@ function renderInventory(container) {
           <div class="glass rounded-xl p-6">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-lg font-semibold text-white">   Organ Availability</h3>
-              <button class="px-4 py-2 btn-primary rounded-lg text-sm font-medium">+ Register Donor</button>
+              <button id="add-organ-donor-btn" class="px-4 py-2 btn-primary rounded-lg text-sm font-medium">+ Register Donor</button>
             </div>
             <div class="space-y-4">
-              ${sampleOrgans.map(o => `
+              ${displayOrgans.map(o => `
                 <div class="flex items-center justify-between p-4 bg-slate-800 rounded-lg">
                   <div class="flex items-center space-x-4">
                     <span class="text-2xl">${o.type === 'Heart' ? '❤️' : o.type === 'Kidney' ? '🫘' : o.type === 'Liver' ? '🫁' : o.type === 'Lungs' ? '🌬     ' : '👁️'}</span>
@@ -2017,7 +2210,7 @@ function renderInventory(container) {
               <thead class="sticky top-0 bg-slate-800">
                 <tr class="text-left text-gray-400 text-sm">
                   <th class="pb-3 pr-4">Name</th>
-                  <th class="pb-3 pr-4">Blood Type</th>
+                  <th class="pb-3 pr-4">Type</th>
                   <th class="pb-3 pr-4">Phone</th>
                   <th class="pb-3 pr-4">Address</th>
                   <th class="pb-3 pr-4">Last Donation</th>
@@ -2025,30 +2218,18 @@ function renderInventory(container) {
                 </tr>
               </thead>
               <tbody>
-                <tr class="border-t border-slate-700">
-                  <td class="py-3 pr-4 text-white">James Anderson</td>
-                  <td class="py-3 pr-4 text-red-400 font-bold">O+</td>
-                  <td class="py-3 pr-4 text-gray-300">555-0201</td>
-                  <td class="py-3 pr-4 text-gray-300">123 Oak Street</td>
-                  <td class="py-3 pr-4 text-gray-300">Jan 10, 2024</td>
-                  <td class="py-3"><span class="status-badge status-admitted">Eligible</span></td>
-                </tr>
-                <tr class="border-t border-slate-700">
-                  <td class="py-3 pr-4 text-white">Maria Garcia</td>
-                  <td class="py-3 pr-4 text-red-400 font-bold">A-</td>
-                  <td class="py-3 pr-4 text-gray-300">555-0202</td>
-                  <td class="py-3 pr-4 text-gray-300">456 Pine Avenue</td>
-                  <td class="py-3 pr-4 text-gray-300">Dec 28, 2023</td>
-                  <td class="py-3"><span class="status-badge status-transferred">Waiting</span></td>
-                </tr>
-                <tr class="border-t border-slate-700">
-                  <td class="py-3 pr-4 text-white">Robert Kim</td>
-                  <td class="py-3 pr-4 text-red-400 font-bold">B+</td>
-                  <td class="py-3 pr-4 text-gray-300">555-0203</td>
-                  <td class="py-3 pr-4 text-gray-300">789 Elm Road</td>
-                  <td class="py-3 pr-4 text-gray-300">Jan 5, 2024</td>
-                  <td class="py-3"><span class="status-badge status-admitted">Eligible</span></td>
-                </tr>
+                ${displayDonors.map(d => `
+                  <tr class="border-t border-slate-700 hover:bg-slate-800/50 transition-colors">
+                    <td class="py-3 pr-4 text-white">${d.name}</td>
+                    <td class="py-3 pr-4 ${d.donation_type === 'Blood' ? 'text-red-400 font-bold' : 'text-blue-400 font-bold'}">
+                        ${d.donation_type === 'Blood' ? d.blood_group : d.organ_type}
+                    </td>
+                    <td class="py-3 pr-4 text-gray-300">${d.contact || 'N/A'}</td>
+                    <td class="py-3 pr-4 text-gray-300">${d.address || 'N/A'}</td>
+                    <td class="py-3 pr-4 text-gray-300">${d.last_donation || formatDate(new Date())}</td>
+                    <td class="py-3"><span class="status-badge ${d.status === 'Eligible' ? 'status-admitted' : d.status === 'Waiting' ? 'status-transferred' : 'status-discharged'}">${d.status}</span></td>
+                  </tr>
+                `).join('')}
               </tbody>
             </table>
           </div>
@@ -2058,7 +2239,7 @@ function renderInventory(container) {
         <div class="mt-6 glass rounded-xl p-6 border-2 border-red-500/50">
           <h3 class="text-lg font-semibold text-red-400 mb-4">🚨 Critical Alerts</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            ${sampleBloodStock.filter(b => b.units < 25).map(b => `
+            ${displayBlood.filter(b => b.units < 25).map(b => `
               <div class="p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center space-x-4">
                 <span class="text-3xl pulse-alert">🩸</span>
                 <div>
@@ -2067,7 +2248,7 @@ function renderInventory(container) {
                 </div>
               </div>
             `).join('')}
-            ${sampleOrgans.filter(o => o.available < 5).map(o => `
+            ${displayOrgans.filter(o => o.available < 5).map(o => `
               <div class="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-center space-x-4">
                 <span class="text-3xl">⚠️</span>
                 <div>
@@ -2078,17 +2259,450 @@ function renderInventory(container) {
             `).join('')}
           </div>
         </div>
+
+        <!-- Donation Modal -->
+        <div id="donation-modal" class="fixed inset-0 z-50 hidden">
+          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm modal-overlay"></div>
+          <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md">
+            <div class="glass rounded-xl p-6 border border-slate-700 shadow-2xl relative">
+              <h3 id="donation-modal-title" class="text-xl font-bold text-white mb-4">Add Blood Donor</h3>
+              <form id="donation-form" class="space-y-4">
+                <input type="hidden" id="donation-type" value="Blood">
+                
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-1">Donor Name</label>
+                  <input type="text" id="donor-name" required class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white" placeholder="Enter full name">
+                </div>
+                
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-1">Contact Phone</label>
+                  <input type="tel" id="donor-contact" required class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white" placeholder="555-0000">
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-1">Address</label>
+                  <input type="text" id="donor-address" required class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white" placeholder="Enter address">
+                </div>
+
+                <div id="blood-group-field">
+                  <label class="block text-sm font-medium text-gray-400 mb-1">Blood Group</label>
+                  <select id="donor-blood-group" class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white">
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                  </select>
+                </div>
+
+                <div id="organ-type-field" class="hidden">
+                   <label class="block text-sm font-medium text-gray-400 mb-1">Organ Type</label>
+                   <select id="donor-organ-type" class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white">
+                     <option value="Kidney">Kidney</option>
+                     <option value="Liver">Liver</option>
+                     <option value="Heart">Heart</option>
+                     <option value="Lungs">Lungs</option>
+                     <option value="Cornea">Cornea</option>
+                   </select>
+                </div>
+
+                <div id="units-field">
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Units (bags)</label>
+                    <input type="number" id="donor-units" value="1" min="1" class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white">
+                </div>
+
+                <div class="flex space-x-3 mt-6">
+                  <button type="button" id="cancel-donation-btn" class="flex-1 py-2 px-4 rounded-lg border border-slate-600 text-gray-300 hover:bg-slate-700 transition-colors">Cancel</button>
+                  <button type="submit" class="flex-1 py-2 px-4 rounded-lg btn-primary text-white font-medium hover:shadow-lg transition-all">Submit Record</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        </div>
+
+        <!-- Consume Stock Modal -->
+        <div id="consume-stock-modal" class="fixed inset-0 z-50 hidden">
+           <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+           <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md">
+             <div class="glass rounded-xl p-6 border-2 border-red-500/30 shadow-xl">
+               <h3 class="text-xl font-bold text-white mb-4">Capture Stock Usage</h3>
+               <form id="consume-stock-form" class="space-y-4">
+                 <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Type</label>
+                    <select id="consume-type" class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white">
+                      <option value="Blood">Blood</option>
+                      <option value="Organ">Organ</option>
+                    </select>
+                 </div>
+                 <div id="consume-blood-type">
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Blood Group</label>
+                    <select id="consume-specific-blood" class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white">
+                      <option value="A+">A+</option><option value="A-">A-</option><option value="B+">B+</option><option value="B-">B-</option>
+                      <option value="AB+">AB+</option><option value="AB-">AB-</option><option value="O+">O+</option><option value="O-">O-</option>
+                    </select>
+                 </div>
+                 <div id="consume-organ-type" class="hidden">
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Organ</label>
+                    <select id="consume-specific-organ" class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white">
+                      <option value="Kidney">Kidney</option><option value="Liver">Liver</option><option value="Heart">Heart</option><option value="Lungs">Lungs</option><option value="Cornea">Cornea</option>
+                    </select>
+                 </div>
+                 <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Quantity</label>
+                    <input type="number" id="consume-qty" value="1" min="1" class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white">
+                 </div>
+                 <div class="flex justify-end space-x-3 mt-6">
+                   <button type="button" id="cancel-consume-btn" class="px-4 py-2 text-gray-400 hover:text-white">Cancel</button>
+                   <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700">Confirm Usage</button>
+                 </div>
+               </form>
+             </div>
+           </div>
+        </div>
       `;
+
+  // Consume Modal Logic
+  const consumeModal = document.getElementById('consume-stock-modal');
+  const consumeType = document.getElementById('consume-type');
+  const consumeBlood = document.getElementById('consume-blood-type');
+  const consumeOrgan = document.getElementById('consume-organ-type');
+
+  document.getElementById('consume-stock-btn')?.addEventListener('click', () => consumeModal.classList.remove('hidden'));
+  document.getElementById('cancel-consume-btn')?.addEventListener('click', () => consumeModal.classList.add('hidden'));
+
+  consumeType?.addEventListener('change', (e) => {
+    if (e.target.value === 'Blood') {
+      consumeBlood.classList.remove('hidden');
+      consumeOrgan.classList.add('hidden');
+    } else {
+      consumeBlood.classList.add('hidden');
+      consumeOrgan.classList.remove('hidden');
+    }
+  });
+
+  document.getElementById('consume-stock-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const type = consumeType.value;
+    const specific = type === 'Blood' ? document.getElementById('consume-specific-blood').value : document.getElementById('consume-specific-organ').value;
+    const qty = document.getElementById('consume-qty').value;
+
+    try {
+      const res = await fetch('/api/inventory/consume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, specific_type: specific, quantity: qty })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Stock usage recorded');
+        consumeModal.classList.add('hidden');
+        renderInventory(container);
+      } else {
+        showToast(data.message || 'Error consuming stock', 'error');
+      }
+    } catch (err) { console.error(err); }
+  });
+
+  // Attach Event Listeners
+  const bloodBtn = document.getElementById('add-blood-donor-btn');
+  const organBtn = document.getElementById('add-organ-donor-btn');
+  const modal = document.getElementById('donation-modal');
+  const modalTitle = document.getElementById('donation-modal-title');
+  const cancelBtn = document.getElementById('cancel-donation-btn');
+  const form = document.getElementById('donation-form');
+  const typeInput = document.getElementById('donation-type');
+  const bloodField = document.getElementById('blood-group-field');
+  const organField = document.getElementById('organ-type-field');
+  const unitsField = document.getElementById('units-field');
+
+  const openModal = (type) => {
+    typeInput.value = type;
+    modal.classList.remove('hidden');
+    if (type === 'Blood') {
+      modalTitle.textContent = 'Add Blood Donor';
+      bloodField.classList.remove('hidden');
+      unitsField.classList.remove('hidden');
+      organField.classList.add('hidden');
+    } else {
+      modalTitle.textContent = 'Register Organ Donor';
+      bloodField.classList.add('hidden');
+      unitsField.classList.add('hidden');
+      organField.classList.remove('hidden');
+    }
+  };
+
+  const closeModal = () => {
+    modal.classList.add('hidden');
+    form.reset();
+  };
+
+  bloodBtn.addEventListener('click', () => openModal('Blood'));
+  organBtn.addEventListener('click', () => openModal('Organ'));
+  cancelBtn.addEventListener('click', closeModal);
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const payload = {
+      name: document.getElementById('donor-name').value,
+      contact: document.getElementById('donor-contact').value,
+      address: document.getElementById('donor-address').value,
+      donation_type: typeInput.value,
+      blood_type: document.getElementById('donor-blood-group').value,
+      organ_type: document.getElementById('donor-organ-type').value,
+      units: parseInt(document.getElementById('donor-units').value) || 1
+    };
+
+    try {
+      const response = await fetch('/api/inventory/donate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        showToast('Donation recorded successfully');
+        closeModal();
+        renderInventory(container); // Refresh data
+      } else {
+        showToast(result.error || 'Failed to record donation', 'error');
+      }
+    } catch (error) {
+      console.error('Donation error:', error);
+      showToast('Error connecting to server', 'error');
+    }
+  });
+
 }
 
-function renderRecords(container) {
+async function renderDashboard(container) {
+  // Fetch metrics from API
+  const metrics = await loadDashboardMetrics();
+
+  // Use API data if available, fallback to hardcoded values
+  const occupancyRate = metrics?.bed_occupancy?.rate || 78.0;
+  const occupiedBeds = metrics?.bed_occupancy?.occupied || 156;
+  const totalBeds = metrics?.bed_occupancy?.total || 200;
+  const patientAdmissions = metrics?.patient_admissions || 2;
+  const staffOnDuty = metrics?.staff_on_duty || 4;
+  const profit = metrics?.daily_pl?.profit || -180000;
+  const totalRevenue = metrics?.daily_pl?.revenue || 100000;
+  const emergencyWaiting = metrics?.emergency_waiting || 7;
+  const icuOccupancy = metrics?.icu_occupancy?.occupied || 18;
+  const icuTotal = metrics?.icu_occupancy?.total || 20;
+  const surgeriesScheduled = metrics?.surgeries_scheduled || 5;
+  const lowStockBlood = metrics?.blood_low_stock || 4;
+  const criticalPatients = metrics?.critical_patients || 1;
+
+  const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+  container.innerHTML = `
+    <!-- Real-time Status Bar -->
+    <div class="glass rounded-xl p-4 mb-6 flex items-center justify-between">
+      <div class="flex items-center space-x-6">
+        <div class="flex items-center space-x-2">
+          <span class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
+          <span class="text-gray-400 text-sm">System Online</span>
+        </div>
+        <div class="text-gray-400 text-sm">🕐 ${currentTime}</div>
+        <div class="text-gray-400 text-sm">📅 ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+      </div>
+      <div class="flex items-center space-x-4">
+        <div class="text-red-400 text-sm font-medium">🚨 ${criticalPatients} Critical Patients</div>
+        <div class="text-yellow-400 text-sm font-medium">⚠️ ${lowStockBlood} Blood Low Stock</div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <!-- Stat Cards -->
+      <div class="glass rounded-xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-3xl">🛏️</span>
+          <span class="text-green-400 text-sm font-medium">+5.2%</span>
+        </div>
+        <h3 class="text-gray-400 text-sm">Bed Occupancy</h3>
+        <p class="text-2xl font-bold text-white">${occupancyRate}%</p>
+        <p class="text-xs text-gray-500 mt-1">${occupiedBeds}/${totalBeds} beds occupied</p>
+      </div>
+
+      <div class="glass rounded-xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-3xl">👥</span>
+          <span class="text-blue-400 text-sm font-medium">Today</span>
+        </div>
+        <h3 class="text-gray-400 text-sm">Patient Admissions</h3>
+        <p class="text-2xl font-bold text-white">${patientAdmissions}</p>
+        <p class="text-xs text-gray-500 mt-1">3 critical, 2 stable</p>
+      </div>
+
+      <div class="glass rounded-xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-3xl">👨‍⚕️</span>
+          <span class="text-purple-400 text-sm font-medium">Active</span>
+        </div>
+        <h3 class="text-gray-400 text-sm">Staff on Duty</h3>
+        <p class="text-2xl font-bold text-white">${staffOnDuty}</p>
+        <p class="text-xs text-gray-500 mt-1">Ratio: 1:4 (Staff:Patient)</p>
+      </div>
+
+      <div class="glass rounded-xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-3xl">💰</span>
+          <span class="${profit >= 0 ? 'text-green-400' : 'text-red-400'} text-sm font-medium">${profit >= 0 ? '+' : ''}</span>
+        </div>
+        <h3 class="text-gray-400 text-sm">Daily P&L</h3>
+        <p class="text-2xl font-bold ${profit >= 0 ? 'text-green-400' : 'text-red-400'}">${formatCurrency(profit)}</p>
+        <p class="text-xs text-gray-500 mt-1">Revenue: ${formatCurrency(totalRevenue)}</p>
+      </div>
+    </div>
+
+    <!-- Additional Real-time Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div class="glass rounded-xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-3xl">🚑</span>
+          <span class="text-red-400 text-sm font-medium pulse-alert">Live</span>
+        </div>
+        <h3 class="text-gray-400 text-sm">Emergency Waiting</h3>
+        <p class="text-2xl font-bold text-white">${emergencyWaiting}</p>
+        <p class="text-xs text-gray-500 mt-1">Average wait: 12 mins</p>
+      </div>
+
+      <div class="glass rounded-xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-3xl">🏥</span>
+          <span class="${icuOccupancy >= 18 ? 'text-red-400' : 'text-green-400'} text-sm font-medium">${Math.round((icuOccupancy / icuTotal) * 100)}%</span>
+        </div>
+        <h3 class="text-gray-400 text-sm">ICU Occupancy</h3>
+        <p class="text-2xl font-bold text-white">${icuOccupancy}/${icuTotal}</p>
+        <p class="text-xs text-gray-500 mt-1">${icuTotal - icuOccupancy} beds available</p>
+      </div>
+
+      <div class="glass rounded-xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-3xl">⚕️</span>
+          <span class="text-blue-400 text-sm font-medium">Today</span>
+        </div>
+        <h3 class="text-gray-400 text-sm">Surgeries Scheduled</h3>
+        <p class="text-2xl font-bold text-white">${surgeriesScheduled}</p>
+        <p class="text-xs text-gray-500 mt-1">3 completed, 2 ongoing</p>
+      </div>
+
+      <div class="glass rounded-xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-3xl">🩸</span>
+          <span class="${lowStockBlood > 2 ? 'text-red-400' : 'text-green-400'} text-sm font-medium">${lowStockBlood > 0 ? 'Alert' : 'Good'}</span>
+        </div>
+        <h3 class="text-gray-400 text-sm">Blood Stock Status</h3>
+        <p class="text-2xl font-bold ${lowStockBlood > 2 ? 'text-red-400' : 'text-white'}">${lowStockBlood}</p>
+        <p class="text-xs text-gray-500 mt-1">Blood types low on stock</p>
+      </div>
+    </div>
+
+    <div class="glass rounded-xl p-6 mb-6">
+      <h3 class="text-lg font-semibold text-white mb-4">Recent Admissions</h3>
+      <div class="table-container">
+        <table class="w-full">
+          <thead class="sticky top-0 bg-slate-800">
+            <tr class="text-left text-gray-400 text-sm">
+              <th class="pb-3 pr-4">Patient</th>
+              <th class="pb-3 pr-4">Department</th>
+              <th class="pb-3 pr-4">Status</th>
+              <th class="pb-3">Date</th>
+            </tr>
+          </thead>
+          <tbody id="recent-admissions-body">
+            <tr class="border-t border-slate-700">
+              <td colspan="4" class="py-3 text-center text-gray-400">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  // Load recent admissions
+  loadRecentAdmissions();
+}
+
+async function loadRecentAdmissions() {
+  try {
+    const response = await fetch('/api/patients');
+    const data = await response.json();
+    if (data.success && data.patients) {
+      const tbody = document.getElementById('recent-admissions-body');
+      if (tbody) {
+        tbody.innerHTML = data.patients.slice(0, 5).map(p => `
+          <tr class="border-t border-slate-700">
+            <td class="py-3 pr-4">
+              <p class="text-white font-medium">${p.name}</p>
+              <p class="text-xs text-gray-400">${p.id}</p>
+            </td>
+            <td class="py-3 pr-4 text-gray-300">${p.department || 'N/A'}</td>
+            <td class="py-3 pr-4">
+              <span class="status-badge status-${p.status}">${p.status}</span>
+            </td>
+            <td class="py-3 text-gray-400">${formatDate(p.admitted_date)}</td>
+          </tr>
+        `).join('');
+      }
+    }
+  } catch (error) {
+    console.error('Error loading recent admissions:', error);
+  }
+}
+
+
+async function renderRecords(container) {
+  // Show loading state
+  container.innerHTML = `
+    <div class="flex items-center justify-center h-full">
+      <div class="text-center">
+        <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
+        <p class="text-gray-400">Loading medical records...</p>
+      </div>
+    </div>
+  `;
+
+  const records = await loadMedicalRecords();
+  let displayRecords = records.length > 0 ? records : sampleRecords;
+  let filteredRecords = [...displayRecords];
+  const isCEO = currentUser.role === 'CEO';
+
+  const renderTable = () => {
+    const tbody = document.querySelector('#records-table-body');
+    if (!tbody) return;
+
+    tbody.innerHTML = filteredRecords.map(r => `
+      <tr class="border-t border-slate-700 hover:bg-slate-800/50 transition-colors" data-record-id="${r.id}">
+        <td class="py-3 pr-4 text-blue-400 font-mono">${r.id}</td>
+        <td class="py-3 pr-4 text-gray-300 font-mono">${r.patientId}</td>
+        <td class="py-3 pr-4 text-white font-medium">${r.name}</td>
+        <td class="py-3 pr-4 text-gray-300">${r.diagnosis}</td>
+        <td class="py-3 pr-4 text-gray-300">${r.treatment}</td>
+        <td class="py-3 pr-4 text-gray-300">${r.doctor}</td>
+        <td class="py-3 pr-4 text-gray-300">${formatDate(r.lastVisit)}</td>
+        <td class="py-3">
+          <button class="view-record-btn p-2 hover:bg-slate-700 rounded-lg transition-colors" title="View Full Record" data-id="${r.id}">👁️</button>
+          ${!isCEO ? `<button class="edit-record-btn p-2 hover:bg-slate-700 rounded-lg transition-colors" title="Edit" data-id="${r.id}">✏️</button>` : ''}
+          <button class="download-record-btn p-2 hover:bg-slate-700 rounded-lg transition-colors" title="Download" data-id="${r.id}">⬇️</button>
+        </td>
+      </tr>
+    `).join('');
+  };
+
   container.innerHTML = `
         <div class="glass rounded-xl p-6">
           <div class="flex items-center justify-between mb-6">
             <h3 class="text-lg font-semibold text-white">📋 Medical Records Database</h3>
             <div class="flex items-center space-x-4">
               <input type="text" id="records-search" placeholder="Search by patient name or ID..." class="px-4 py-2 rounded-lg input-field w-80">
-              <button class="px-4 py-2 btn-primary rounded-lg font-medium">+ Add Record</button>
+              ${!isCEO ? '<button id="add-record-btn" class="px-4 py-2 btn-primary rounded-lg font-medium">+ Add Record</button>' : ''}
             </div>
           </div>
 
@@ -2106,104 +2720,297 @@ function renderRecords(container) {
                   <th class="pb-3">Actions</th>
                 </tr>
               </thead>
-              <tbody>
-                ${sampleRecords.map(r => `
-                  <tr class="border-t border-slate-700 hover:bg-slate-800/50 transition-colors">
-                    <td class="py-3 pr-4 text-blue-400 font-mono">${r.id}</td>
-                    <td class="py-3 pr-4 text-gray-300 font-mono">${r.patientId}</td>
-                    <td class="py-3 pr-4 text-white font-medium">${r.name}</td>
-                    <td class="py-3 pr-4 text-gray-300">${r.diagnosis}</td>
-                    <td class="py-3 pr-4 text-gray-300">${r.treatment}</td>
-                    <td class="py-3 pr-4 text-gray-300">${r.doctor}</td>
-                    <td class="py-3 pr-4 text-gray-300">${formatDate(r.lastVisit)}</td>
-                    <td class="py-3">
-                      <button class="p-2 hover:bg-slate-700 rounded-lg transition-colors" title="View Full Record">👁️</button>
-                      <button class="p-2 hover:bg-slate-700 rounded-lg transition-colors" title="Edit">✏️</button>
-                      <button class="p-2 hover:bg-slate-700 rounded-lg transition-colors" title="Download">⬇️</button>
-                    </td>
-                  </tr>
-                `).join('')}
+              <tbody id="records-table-body">
               </tbody>
             </table>
           </div>
 
           <div class="mt-6 p-4 bg-slate-800 rounded-lg">
-            <p class="text-gray-400 text-sm">   <strong class="text-white">Note:</strong> All medical records are encrypted and stored securely. Access is logged for compliance purposes.</p>
+            <p class="text-gray-400 text-sm">🔒 <strong class="text-white">Note:</strong> All medical records are encrypted and stored securely. Access is logged for compliance purposes.</p>
           </div>
         </div>
-      `;
-}
 
-function renderCertificates(container) {
-  container.innerHTML = `
-        <div class="glass rounded-xl p-6">
-          <div class="flex items-center justify-between mb-6">
-            <h3 class="text-lg font-semibold text-white">📜 Employee Certificates & Credentials</h3>
-            <div class="flex items-center space-x-4">
-              <select class="px-4 py-2 rounded-lg input-field">
-                <option value="">All Status</option>
-                <option value="Valid">Valid</option>
-                <option value="Expiring Soon">Expiring Soon</option>
-                <option value="Expired">Expired</option>
-              </select>
-              <button class="px-4 py-2 btn-primary rounded-lg font-medium">+ Add Certificate</button>
+        <!-- Add/Edit Record Modal -->
+        <div id="record-modal" class="fixed inset-0 z-50 hidden">
+          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+          <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl">
+            <div class="glass rounded-xl p-6 border border-slate-700 shadow-2xl max-h-[90vh] overflow-y-auto">
+              <h3 id="record-modal-title" class="text-xl font-bold text-white mb-4">Add Medical Record</h3>
+              <form id="record-form" class="space-y-4">
+                <input type="hidden" id="record-id">
+                <input type="hidden" id="record-mode" value="add">
+                
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Patient ID</label>
+                    <input type="text" id="record-patient-id" required class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white" placeholder="ADM001">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Patient Name</label>
+                    <input type="text" id="record-patient-name" required class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white" placeholder="John Doe">
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-1">Diagnosis</label>
+                  <input type="text" id="record-diagnosis" required class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white" placeholder="Enter diagnosis">
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-400 mb-1">Treatment</label>
+                  <input type="text" id="record-treatment" required class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white" placeholder="Enter treatment plan">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Attending Doctor</label>
+                    <input type="text" id="record-doctor" required class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white" placeholder="Dr. Smith">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Last Visit Date</label>
+                    <input type="date" id="record-last-visit" required class="w-full px-4 py-2 rounded-lg input-field bg-slate-800 border-slate-600 text-white">
+                  </div>
+                </div>
+
+                <div class="flex space-x-3 mt-6">
+                  <button type="button" id="cancel-record-btn" class="flex-1 py-2 px-4 rounded-lg border border-slate-600 text-gray-300 hover:bg-slate-700 transition-colors">Cancel</button>
+                  <button type="submit" class="flex-1 py-2 px-4 rounded-lg btn-primary text-white font-medium">Save Record</button>
+                </div>
+              </form>
             </div>
           </div>
+        </div>
 
-          <div class="table-container">
-            <table class="w-full">
-              <thead class="sticky top-0 bg-slate-800">
-                <tr class="text-left text-gray-400 text-sm">
-                  <th class="pb-3 pr-4">Cert ID</th>
-                  <th class="pb-3 pr-4">Employee</th>
-                  <th class="pb-3 pr-4">Certificate/Degree</th>
-                  <th class="pb-3 pr-4">Issue Date</th>
-                  <th class="pb-3 pr-4">Expiry Date</th>
-                  <th class="pb-3 pr-4">Status</th>
-                  <th class="pb-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${sampleCertificates.map(c => `
-                  <tr class="border-t border-slate-700 hover:bg-slate-800/50 transition-colors">
-                    <td class="py-3 pr-4 text-blue-400 font-mono">${c.id}</td>
-                    <td class="py-3 pr-4">
-                      <p class="text-white font-medium">${c.name}</p>
-                      <p class="text-xs text-gray-400">${c.employeeId}</p>
-                    </td>
-                    <td class="py-3 pr-4 text-gray-300">${c.certificate}</td>
-                    <td class="py-3 pr-4 text-gray-300">${formatDate(c.issueDate)}</td>
-                    <td class="py-3 pr-4 text-gray-300">${formatDate(c.expiryDate)}</td>
-                    <td class="py-3 pr-4">
-                      <span class="status-badge ${c.status === 'Valid' ? 'status-admitted' : c.status === 'Expiring Soon' ? 'status-transferred' : 'status-discharged'}">${c.status}</span>
-                    </td>
-                    <td class="py-3">
-                      <button class="p-2 hover:bg-slate-700 rounded-lg transition-colors" title="View">👁️</button>
-                      <button class="p-2 hover:bg-slate-700 rounded-lg transition-colors" title="Update">🔄</button>
-                      <button class="p-2 hover:bg-slate-700 rounded-lg transition-colors" title="Notify">📧</button>
-                    </td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Expiry Alerts -->
-          <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            ${sampleCertificates.filter(c => c.status === 'Expiring Soon').map(c => `
-              <div class="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-center space-x-4">
-                <span class="text-2xl pulse-alert">⏰</span>
-                <div>
-                  <p class="text-yellow-400 font-medium">Certificate Expiring Soon</p>
-                  <p class="text-gray-300 text-sm">${c.name}'s ${c.certificate} expires on ${formatDate(c.expiryDate)}</p>
-                  <p class="text-xs text-gray-400 mt-1">Last updated: ${formatDate(c.issueDate)}</p>
-                </div>
+        <!-- View Record Modal -->
+        <div id="view-record-modal" class="fixed inset-0 z-50 hidden">
+          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+          <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl">
+            <div class="glass rounded-xl p-6 border border-slate-700 shadow-2xl">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-white">Medical Record Details</h3>
+                <button id="close-view-modal" class="text-gray-400 hover:text-white">✕</button>
               </div>
-            `).join('')}
+              <div id="view-record-content" class="space-y-4">
+              </div>
+            </div>
           </div>
         </div>
       `;
+
+  // Initial render
+  renderTable();
+
+  // Search functionality
+  const searchInput = document.getElementById('records-search');
+  searchInput.addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase();
+    filteredRecords = displayRecords.filter(r =>
+      r.name.toLowerCase().includes(query) ||
+      r.patientId.toLowerCase().includes(query) ||
+      r.id.toLowerCase().includes(query)
+    );
+    renderTable();
+  });
+
+  // Add Record button
+  // Add Record button
+  const modal = document.getElementById('record-modal');
+  const form = document.getElementById('record-form');
+  const cancelBtn = document.getElementById('cancel-record-btn');
+
+  document.getElementById('add-record-btn')?.addEventListener('click', () => {
+    document.getElementById('record-modal-title').textContent = 'Add Medical Record';
+    document.getElementById('record-mode').value = 'add';
+    form.reset();
+
+    // Enable Patient ID field for adding new records
+    document.getElementById('record-patient-id').disabled = false;
+
+    // Auto-generate next Patient ID
+    const existingPatientNumbers = displayRecords
+      .map(r => {
+        const match = r.patientId.match(/^ADM(\d+)$/);
+        return match ? parseInt(match[1]) : 0;
+      })
+      .filter(n => n > 0);
+
+    const nextPatientNumber = existingPatientNumbers.length > 0
+      ? Math.max(...existingPatientNumbers) + 1
+      : 1;
+
+    const nextPatientId = `ADM${String(nextPatientNumber).padStart(3, '0')}`;
+    document.getElementById('record-patient-id').value = nextPatientId;
+
+    document.getElementById('record-last-visit').valueAsDate = new Date();
+    modal.classList.remove('hidden');
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    modal.classList.add('hidden');
+    form.reset();
+  });
+
+  // Form submission
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const mode = document.getElementById('record-mode').value;
+
+    // Generate sequential Record ID for new records
+    let recordId;
+    if (mode === 'add') {
+      // Find the highest existing record number
+      const existingNumbers = displayRecords
+        .map(r => {
+          const match = r.id.match(/^REC(\d+)$/);
+          return match ? parseInt(match[1]) : 0;
+        })
+        .filter(n => n > 0);
+
+      const nextNumber = existingNumbers.length > 0
+        ? Math.max(...existingNumbers) + 1
+        : 1;
+
+      recordId = `REC${String(nextNumber).padStart(3, '0')}`;
+    } else {
+      recordId = document.getElementById('record-id').value;
+    }
+
+    const payload = {
+      id: recordId,
+      patientId: document.getElementById('record-patient-id').value,
+      name: document.getElementById('record-patient-name').value,
+      diagnosis: document.getElementById('record-diagnosis').value,
+      treatment: document.getElementById('record-treatment').value,
+      doctor: document.getElementById('record-doctor').value,
+      lastVisit: document.getElementById('record-last-visit').value
+    };
+
+    try {
+      const response = await fetch('/api/records', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        showToast(mode === 'add' ? 'Record added successfully' : 'Record updated successfully');
+        modal.classList.add('hidden');
+        form.reset();
+        renderRecords(container); // Refresh
+      } else {
+        showToast(result.error || 'Failed to save record', 'error');
+      }
+    } catch (error) {
+      console.error('Save record error:', error);
+      showToast('Error connecting to server', 'error');
+    }
+  });
+
+  // View Record buttons
+  container.addEventListener('click', (e) => {
+    if (e.target.classList.contains('view-record-btn')) {
+      const recordId = e.target.dataset.id;
+      const record = displayRecords.find(r => r.id === recordId);
+      if (record) {
+        const viewModal = document.getElementById('view-record-modal');
+        const content = document.getElementById('view-record-content');
+        content.innerHTML = `
+          <div class="grid grid-cols-2 gap-4">
+            <div class="p-4 bg-slate-800 rounded-lg">
+              <p class="text-gray-400 text-sm">Record ID</p>
+              <p class="text-white font-mono font-bold">${record.id}</p>
+            </div>
+            <div class="p-4 bg-slate-800 rounded-lg">
+              <p class="text-gray-400 text-sm">Patient ID</p>
+              <p class="text-white font-mono font-bold">${record.patientId}</p>
+            </div>
+            <div class="p-4 bg-slate-800 rounded-lg col-span-2">
+              <p class="text-gray-400 text-sm">Patient Name</p>
+              <p class="text-white font-bold text-lg">${record.name}</p>
+            </div>
+            <div class="p-4 bg-slate-800 rounded-lg col-span-2">
+              <p class="text-gray-400 text-sm">Diagnosis</p>
+              <p class="text-white">${record.diagnosis}</p>
+            </div>
+            <div class="p-4 bg-slate-800 rounded-lg col-span-2">
+              <p class="text-gray-400 text-sm">Treatment Plan</p>
+              <p class="text-white">${record.treatment}</p>
+            </div>
+            <div class="p-4 bg-slate-800 rounded-lg">
+              <p class="text-gray-400 text-sm">Attending Doctor</p>
+              <p class="text-white">${record.doctor}</p>
+            </div>
+            <div class="p-4 bg-slate-800 rounded-lg">
+              <p class="text-gray-400 text-sm">Last Visit</p>
+              <p class="text-white">${formatDate(record.lastVisit)}</p>
+            </div>
+          </div>
+        `;
+        viewModal.classList.remove('hidden');
+      }
+    }
+
+    // Edit Record buttons
+    if (e.target.classList.contains('edit-record-btn')) {
+      const recordId = e.target.dataset.id;
+      const record = displayRecords.find(r => r.id === recordId);
+      if (record) {
+        document.getElementById('record-modal-title').textContent = 'Edit Medical Record';
+        document.getElementById('record-mode').value = 'edit';
+        document.getElementById('record-id').value = record.id;
+        document.getElementById('record-patient-id').value = record.patientId;
+
+        // Disable Patient ID field in edit mode
+        document.getElementById('record-patient-id').disabled = true;
+
+        document.getElementById('record-patient-name').value = record.name;
+        document.getElementById('record-diagnosis').value = record.diagnosis;
+        document.getElementById('record-treatment').value = record.treatment;
+        document.getElementById('record-doctor').value = record.doctor;
+        document.getElementById('record-last-visit').value = record.lastVisit;
+        modal.classList.remove('hidden');
+      }
+    }
+
+    // Download Record buttons
+    if (e.target.classList.contains('download-record-btn')) {
+      const recordId = e.target.dataset.id;
+      const record = displayRecords.find(r => r.id === recordId);
+      if (record) {
+        const content = `
+MEDICAL RECORD
+==============
+Record ID: ${record.id}
+Patient ID: ${record.patientId}
+Patient Name: ${record.name}
+Diagnosis: ${record.diagnosis}
+Treatment: ${record.treatment}
+Attending Doctor: ${record.doctor}
+Last Visit: ${formatDate(record.lastVisit)}
+
+Generated: ${new Date().toLocaleString()}
+        `;
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Medical_Record_${record.id}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('Record downloaded successfully');
+      }
+    }
+  });
+
+  // Close view modal
+  document.getElementById('close-view-modal').addEventListener('click', () => {
+    document.getElementById('view-record-modal').classList.add('hidden');
+  });
 }
+
+
 
 // ============ EVENT HANDLERS ============
 function attachLoginEvents() {
@@ -2317,7 +3124,7 @@ function showTaskManager() {
       userTasks.map((task, idx) => `
                   <div class="p-4 bg-slate-800 rounded-lg flex items-start justify-between hover:bg-slate-700 transition-colors">
                     <div class="flex items-start space-x-3">
-                      <input type="checkbox" class="mt-1 w-5 h-5 rounded" ${task.completed ? 'checked' : ''} onchange="toggleTask(${idx})">
+                      <input type="checkbox" class="mt-1 w-5 h-5 rounded" ${task.completed ? 'checked' : ''} onchange="toggleTask(${task.id})">
                       <div>
                         <p class="text-white ${task.completed ? 'line-through text-gray-500' : ''}">${task.description}</p>
                         <div class="flex items-center space-x-3 mt-1">
@@ -2326,7 +3133,7 @@ function showTaskManager() {
                         </div>
                       </div>
                     </div>
-                    <button onclick="deleteTask(${idx})" class="text-red-400 hover:text-red-300">🗑️</button>
+                    <button onclick="deleteTask(${task.id})" class="text-red-400 hover:text-red-300">🗑️</button>
                   </div>
                 `).join('')}
             </div>
@@ -2343,31 +3150,66 @@ function showTaskManager() {
     if (e.target === modal) modal.remove();
   });
 
-  document.getElementById('add-task-form').addEventListener('submit', (e) => {
+  document.getElementById('add-task-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const description = document.getElementById('task-description').value;
     const dueDate = document.getElementById('task-date').value;
     const priority = document.getElementById('task-priority').value;
 
-    userTasks.push({ description, dueDate, priority, completed: false });
-    updateTaskBadge();
-    showToast('Task added successfully!');
-    modal.remove();
-    showTaskManager();
+    try {
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description, dueDate, priority })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        await loadTasks();
+        showToast('Task added successfully!');
+        modal.remove();
+        showTaskManager();
+      } else {
+        showToast('Failed to add task', 'error');
+      }
+    } catch (error) {
+      console.error('Add task error:', error);
+      showToast('Error adding task', 'error');
+    }
   });
 }
 
-function toggleTask(idx) {
-  userTasks[idx].completed = !userTasks[idx].completed;
-  updateTaskBadge();
+async function toggleTask(id) {
+  try {
+    const response = await fetch(`/api/tasks/${id}/toggle`, { method: 'PUT' });
+    if (response.ok) {
+      await loadTasks();
+      modal = document.getElementById('task-manager-modal');
+      if (modal) {
+        modal.remove();
+        showTaskManager();
+      }
+    }
+  } catch (error) {
+    console.error('Toggle task error:', error);
+  }
 }
 
-function deleteTask(idx) {
-  userTasks.splice(idx, 1);
-  updateTaskBadge();
-  showToast('Task deleted');
-  document.getElementById('task-manager-modal')?.remove();
-  showTaskManager();
+async function deleteTask(id) {
+  if (!confirm('Are you sure you want to delete this task?')) return;
+
+  try {
+    const response = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+    if (response.ok) {
+      await loadTasks();
+      showToast('Task deleted');
+      document.getElementById('task-manager-modal')?.remove();
+      showTaskManager();
+    }
+  } catch (error) {
+    console.error('Delete task error:', error);
+    showToast('Error deleting task', 'error');
+  }
 }
 
 function updateTaskBadge() {

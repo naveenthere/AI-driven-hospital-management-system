@@ -238,6 +238,16 @@ def create_patient():
             )
             
             cursor.execute(query, values)
+            
+            # --- AI Data Sync: Update daily_admissions ---
+            admitted_date = data.get('admittedDate', datetime.now().strftime('%Y-%m-%d'))
+            cursor.execute("""
+                INSERT INTO daily_admissions (admission_date, total_admissions)
+                VALUES (%s, 1)
+                ON DUPLICATE KEY UPDATE total_admissions = total_admissions + 1
+            """, (admitted_date,))
+            # ---------------------------------------------
+            
             conn.commit()
             
             # Return the created patient with generated IDs

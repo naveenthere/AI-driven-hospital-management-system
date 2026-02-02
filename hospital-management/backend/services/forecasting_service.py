@@ -55,23 +55,77 @@ class ForecastingService:
     
     def fit_model(self, time_series):
         """
-        Fit the selected forecasting model
+        Fit the selected forecasting model with optimization
         
         Args:
             time_series: pandas Series with datetime index
         """
+        best_model = None
+        best_aic = float('inf')
+        
+        # Define candidate parameters for optimization (Grid Search)
+        # Filters: (p, d, q) x (P, D, Q, s)
+        candidates = [
+            # Default (Balanced)
+            {'order': SARIMA_ORDER, 'seasonal_order': SARIMA_SEASONAL_ORDER},
+            # Simpler (Moving Average focus)
+            {'order': (0, 1, 1), 'seasonal_order': (0, 1, 1, 7)},
+            # AR focus
+            {'order': (1, 1, 0), 'seasonal_order': (1, 0, 0, 7)},
+            # Complex (Higher order)
+            {'order': (2, 1, 1), 'seasonal_order': (1, 1, 1, 7)}
+        ]
+
         if self.model_type == 'ARIMA':
-            self.model = ARIMA(time_series, order=ARIMA_ORDER)
+             # Simplified ARIMA grid
+             arima_candidates = [
+                 {'order': ARIMA_ORDER},
+                 {'order': (1, 1, 1)},
+                 {'order': (0, 1, 1)},
+                 {'order': (2, 1, 0)}
+             ]
+             
+             for params in arima_candidates:
+                 try:
+                     model = ARIMA(time_series, order=params['order'])
+                     result = model.fit()
+                     if result.aic < best_aic:
+                         best_aic = result.aic
+                         best_model = result
+                         # Store best params for info
+                         self.best_params = params
+                 except:
+                     continue
+                     
         elif self.model_type == 'SARIMA':
-            self.model = SARIMAX(
-                time_series,
-                order=SARIMA_ORDER,
-                seasonal_order=SARIMA_SEASONAL_ORDER
-            )
+            for params in candidates:
+                try:
+                    model = SARIMAX(
+                        time_series,
+                        order=params['order'],
+                        seasonal_order=params['seasonal_order'],
+                        enforce_stationarity=False,
+                        enforce_invertibility=False
+                    )
+                    result = model.fit(disp=False)
+                    if result.aic < best_aic:
+                        best_aic = result.aic
+                        best_model = result
+                        self.best_params = params
+                except:
+                    continue
         else:
             raise ValueError(f"Unknown model type: {self.model_type}")
         
-        self.forecast_result = self.model.fit()
+        if best_model is None:
+            # Fallback to default if optimization fails
+            if self.model_type == 'ARIMA':
+                 self.model = ARIMA(time_series, order=ARIMA_ORDER)
+            else:
+                 self.model = SARIMAX(time_series, order=SARIMA_ORDER, seasonal_order=SARIMA_SEASONAL_ORDER)
+            self.forecast_result = self.model.fit()
+        else:
+            self.forecast_result = best_model
         
     def predict(self, steps=FORECAST_DAYS):
         """
@@ -91,9 +145,9 @@ class ForecastingService:
         conf_int = self.forecast_result.get_forecast(steps=steps).conf_int()
         
         return {
-            'predictions': forecast.values.tolist(),
-            'lower_bound': conf_int.iloc[:, 0].values.tolist(),
-            'upper_bound': conf_int.iloc[:, 1].values.tolist()
+            'predictions': [max(0, x) for x in forecast.values.tolist()],
+            'lower_bound': [max(0, x) for x in conf_int.iloc[:, 0].values.tolist()],
+            'upper_bound': [max(0, x) for x in conf_int.iloc[:, 1].values.tolist()]
         }
     
     def calculate_accuracy(self, time_series):
@@ -120,7 +174,19 @@ class ForecastingService:
         predictions = result.forecast(steps=BACKTEST_DAYS)
         
         # Calculate MAPE (Mean Absolute Percentage Error)
-        mape = mean_absolute_percentage_error(test, predictions)
+        # Handle division by zero in test data
+        test_values = test.values
+        pred_values = [max(0, p) for p in predictions.values]
+        
+        errors = []
+        for actual, pred in zip(test_values, pred_values):
+            if actual == 0:
+                # If actual is 0, use absolute error or ignore
+                errors.append(0 if pred < 0.5 else 1.0) # Penalty if predicted high
+            else:
+                errors.append(abs((actual - pred) / actual))
+        
+        mape = np.mean(errors) if errors else 0
         accuracy = (1 - mape) * 100
         
         return max(0, min(100, accuracy))  # Clamp between 0-100
@@ -253,9 +319,13 @@ class ForecastingService:
                 'parameters': f"Order: {ARIMA_ORDER}"
             }
         else:
+            params_str = f"Order: {SARIMA_ORDER}, Seasonal: {SARIMA_SEASONAL_ORDER}"
+            if hasattr(self, 'best_params'):
+                 params_str = f"Optimized Order: {self.best_params['order']}, Seasonal: {self.best_params['seasonal_order']}"
+            
             return {
                 'type': 'SARIMA',
                 'name': 'SARIMA (Seasonal Time Series Forecast)',
                 'description': 'Seasonal Auto-Regressive Integrated Moving Average',
-                'parameters': f"Order: {SARIMA_ORDER}, Seasonal: {SARIMA_SEASONAL_ORDER}"
+                'parameters': params_str
             }

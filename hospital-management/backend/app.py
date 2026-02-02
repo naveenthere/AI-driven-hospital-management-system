@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import blueprints
-from routes import auth_bp, patients_bp, staff_bp, resources_bp, predictions_bp, finance_bp
+from routes import auth_bp, patients_bp, staff_bp, resources_bp, predictions_bp, finance_bp, inventory_bp, records_bp, dashboard_bp, tasks_bp
 
 # Get the absolute path to the project root
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -31,6 +31,10 @@ app.register_blueprint(staff_bp)
 app.register_blueprint(resources_bp)
 app.register_blueprint(predictions_bp)
 app.register_blueprint(finance_bp)
+app.register_blueprint(inventory_bp)
+app.register_blueprint(records_bp)
+app.register_blueprint(dashboard_bp)
+app.register_blueprint(tasks_bp)
 
 
 # ============ ROUTES ============

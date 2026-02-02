@@ -39,8 +39,21 @@ def get_beds():
             cursor = conn.cursor(dictionary=True)
             
             query = """
-                SELECT ward_type, total_beds, occupied_beds
+                SELECT 
+                    CASE 
+                        WHEN is_icu = 1 THEN 'ICU'
+                        WHEN department = 'Pediatrics' THEN 'Pediatric'
+                        ELSE 'General Ward'
+                    END as ward_type,
+                    COUNT(*) as total_beds,
+                    SUM(CASE WHEN status = 'occupied' THEN 1 ELSE 0 END) as occupied_beds
                 FROM beds
+                GROUP BY 
+                    CASE 
+                        WHEN is_icu = 1 THEN 'ICU'
+                        WHEN department = 'Pediatrics' THEN 'Pediatric'
+                        ELSE 'General Ward'
+                    END
                 ORDER BY 
                     CASE ward_type
                         WHEN 'General Ward' THEN 1

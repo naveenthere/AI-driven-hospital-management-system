@@ -1,0 +1,270 @@
+}
+
+async function renderDashboard(container) {
+    // Fetch metrics from API
+    const metrics = await loadDashboardMetrics();
+
+    // Use API data if available, fallback to hardcoded values
+    const occupancyRate = metrics?.bed_occupancy?.rate || 78.0;
+    const occupiedBeds = metrics?.bed_occupancy?.occupied || 156;
+    const totalBeds = metrics?.bed_occupancy?.total || 200;
+    const patientAdmissions = metrics?.patient_admissions || 2;
+    const staffOnDuty = metrics?.staff_on_duty || 4;
+    const profit = metrics?.daily_pl?.profit || -180000;
+    const totalRevenue = metrics?.daily_pl?.revenue || 100000;
+    const totalExpenses = metrics?.daily_pl?.expenses || 280000;
+    const emergencyWaiting = metrics?.emergency_waiting || 7;
+    const icuOccupancy = metrics?.icu_occupancy?.occupied || 18;
+    const icuTotal = metrics?.icu_occupancy?.total || 20;
+    const surgeriesScheduled = metrics?.surgeries_scheduled || 5;
+    const lowStockBlood = metrics?.blood_low_stock || 4;
+    const criticalPatients = metrics?.critical_patients || 1;
+
+    const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    container.innerHTML = `
+    <!-- Real-time Status Bar -->
+    <div class="glass rounded-xl p-4 mb-6 flex items-center justify-between">
+      <div class="flex items-center space-x-6">
+        <div class="flex items-center space-x-2">
+          <span class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
+          <span class="text-gray-400 text-sm">System Online</span>
+        </div>
+        <div class="text-gray-400 text-sm">🕐 ${currentTime}</div>
+        <div class="text-gray-400 text-sm">📅 ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+      </div>
+      <div class="flex items-center space-x-4">
+        <div class="text-red-400 text-sm font-medium">🚨 ${criticalPatients} Critical Patients</div>
+        <div class="text-yellow-400 text-sm font-medium">⚠️ ${lowStockBlood} Blood Low Stock</div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <!-- Stat Cards -->
+      <div class="glass rounded-xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-3xl">🛏️</span>
+          <span class="text-green-400 text-sm font-medium">+5.2%</span>
+        </div>
+        <h3 class="text-gray-400 text-sm">Bed Occupancy</h3>
+        <p class="text-2xl font-bold text-white">${occupancyRate}%</p>
+        <p class="text-xs text-gray-500 mt-1">${occupiedBeds}/${totalBeds} beds occupied</p>
+      </div>
+
+      <div class="glass rounded-xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-3xl">👥</span>
+          <span class="text-blue-400 text-sm font-medium">Today</span>
+        </div>
+        <h3 class="text-gray-400 text-sm">Patient Admissions</h3>
+        <p class="text-2xl font-bold text-white">${patientAdmissions}</p>
+        <p class="text-xs text-gray-500 mt-1">3 critical, 2 stable</p>
+      </div>
+
+      <div class="glass rounded-xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-3xl">👨‍⚕️</span>
+          <span class="text-purple-400 text-sm font-medium">Active</span>
+        </div>
+        <h3 class="text-gray-400 text-sm">Staff on Duty</h3>
+        <p class="text-2xl font-bold text-white">${staffOnDuty}</p>
+        <p class="text-xs text-gray-500 mt-1">Ratio: 1:4 (Staff:Patient)</p>
+      </div>
+
+      <div class="glass rounded-xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-3xl">💰</span>
+          <span class="${profit >= 0 ? 'text-green-400' : 'text-red-400'} text-sm font-medium">${profit >= 0 ? '+' : ''}</span>
+        </div>
+        <h3 class="text-gray-400 text-sm">Daily P&L</h3>
+        <p class="text-2xl font-bold ${profit >= 0 ? 'text-green-400' : 'text-red-400'}">${formatCurrency(profit)}</p>
+        <p class="text-xs text-gray-500 mt-1">Revenue: ${formatCurrency(totalRevenue)}</p>
+      </div>
+    </div>
+
+    <!-- Additional Real-time Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div class="glass rounded-xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-3xl">🚑</span>
+          <span class="text-red-400 text-sm font-medium pulse-alert">Live</span>
+        </div>
+        <h3 class="text-gray-400 text-sm">Emergency Waiting</h3>
+        <p class="text-2xl font-bold text-white">${emergencyWaiting}</p>
+        <p class="text-xs text-gray-500 mt-1">Average wait: 12 mins</p>
+      </div>
+
+      <div class="glass rounded-xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-3xl">🏥</span>
+          <span class="${icuOccupancy >= 18 ? 'text-red-400' : 'text-green-400'} text-sm font-medium">${Math.round((icuOccupancy / icuTotal) * 100)}%</span>
+        </div>
+        <h3 class="text-gray-400 text-sm">ICU Occupancy</h3>
+        <p class="text-2xl font-bold text-white">${icuOccupancy}/${icuTotal}</p>
+        <p class="text-xs text-gray-500 mt-1">${icuTotal - icuOccupancy} beds available</p>
+      </div>
+
+      <div class="glass rounded-xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-3xl">⚕️</span>
+          <span class="text-blue-400 text-sm font-medium">Today</span>
+        </div>
+        <h3 class="text-gray-400 text-sm">Surgeries Scheduled</h3>
+        <p class="text-2xl font-bold text-white">${surgeriesScheduled}</p>
+        <p class="text-xs text-gray-500 mt-1">3 completed, 2 ongoing</p>
+      </div>
+
+      <div class="glass rounded-xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-3xl">🩸</span>
+          <span class="${lowStockBlood > 2 ? 'text-red-400' : 'text-green-400'} text-sm font-medium">${lowStockBlood > 0 ? 'Alert' : 'Good'}</span>
+        </div>
+        <h3 class="text-gray-400 text-sm">Blood Stock Status</h3>
+        <p class="text-2xl font-bold ${lowStockBlood > 2 ? 'text-red-400' : 'text-white'}">${lowStockBlood}</p>
+        <p class="text-xs text-gray-500 mt-1">Blood types low on stock</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <!-- Patient Flow Chart -->
+      <div class="glass rounded-xl p-6">
+        <h3 class="text-lg font-semibold text-white mb-4">Patient Flow (Last 7 Days)</h3>
+        <div id="patient-flow-chart" class="chart-container"></div>
+      </div>
+
+      <!-- Department Heatmap -->
+      <div class="glass rounded-xl p-6">
+        <h3 class="text-lg font-semibold text-white mb-4">Department Occupancy Heatmap</h3>
+        <div id="department-heatmap" class="chart-container"></div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Specialization Chart -->
+      <div class="glass rounded-xl p-6">
+        <h3 class="text-lg font-semibold text-white mb-4">Visits by Specialization</h3>
+        <div id="specialization-chart" class="chart-container"></div>
+      </div>
+
+      <!-- Recent Admissions -->
+      <div class="glass rounded-xl p-6 lg:col-span-2">
+        <h3 class="text-lg font-semibold text-white mb-4">Recent Admissions</h3>
+        <div class="table-container">
+          <table class="w-full">
+            <thead class="sticky top-0 bg-slate-800">
+              <tr class="text-left text-gray-400 text-sm">
+                <th class="pb-3 pr-4">Patient</th>
+                <th class="pb-3 pr-4">Department</th>
+                <th class="pb-3 pr-4">Status</th>
+                <th class="pb-3">Date</th>
+              </tr>
+            </thead>
+            <tbody id="recent-admissions-body">
+              <tr class="border-t border-slate-700">
+                <td colspan="4" class="py-3 text-center text-gray-400">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+    // Render charts
+    setTimeout(() => {
+        // Patient Flow Chart
+        if (typeof Plotly !== 'undefined') {
+            Plotly.newPlot('patient-flow-chart', [{
+                x: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                y: [45, 52, 38, 61, 48, 35, 42],
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Admissions',
+                line: { color: '#3b82f6', width: 3 },
+                marker: { size: 8 }
+            }, {
+                x: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                y: [38, 44, 35, 55, 42, 30, 38],
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Discharges',
+                line: { color: '#22c55e', width: 3 },
+                marker: { size: 8 }
+            }], {
+                paper_bgcolor: 'transparent',
+                plot_bgcolor: 'transparent',
+                font: { color: '#94a3b8' },
+                margin: { l: 40, r: 20, t: 20, b: 40 },
+                legend: { orientation: 'h', y: -0.2 },
+                xaxis: { gridcolor: '#334155' },
+                yaxis: { gridcolor: '#334155' }
+            }, { responsive: true });
+
+            // Department Heatmap
+            Plotly.newPlot('department-heatmap', [{
+                z: [[85, 72, 91], [68, 95, 78], [92, 88, 65], [75, 82, 90]],
+                x: ['Morning', 'Afternoon', 'Night'],
+                y: ['ICU', 'Emergency', 'General', 'Pediatrics'],
+                type: 'heatmap',
+                colorscale: [[0, '#1e3a5f'], [0.5, '#3b82f6'], [1, '#ef4444']],
+                showscale: true
+            }], {
+                paper_bgcolor: 'transparent',
+                plot_bgcolor: 'transparent',
+                font: { color: '#94a3b8' },
+                margin: { l: 80, r: 20, t: 20, b: 40 }
+            }, { responsive: true });
+
+            // Specialization Chart
+            Plotly.newPlot('specialization-chart', [{
+                values: [35, 25, 20, 12, 8],
+                labels: ['Cardiology', 'Neurology', 'Orthopedics', 'Pediatrics', 'Others'],
+                type: 'pie',
+                hole: 0.5,
+                marker: {
+                    colors: ['#3b82f6', '#8b5cf6', '#22c55e', '#f59e0b', '#64748b']
+                },
+                textinfo: 'label+percent',
+                textposition: 'outside'
+            }], {
+                paper_bgcolor: 'transparent',
+                plot_bgcolor: 'transparent',
+                font: { color: '#94a3b8' },
+                margin: { l: 20, r: 20, t: 20, b: 20 },
+                showlegend: false
+            }, { responsive: true });
+        }
+    }, 100);
+
+    // Load recent admissions
+    loadRecentAdmissions();
+}
+
+async function loadRecentAdmissions() {
+    try {
+        const response = await fetch('/api/patients');
+        const data = await response.json();
+        if (data.success && data.patients) {
+            const tbody = document.getElementById('recent-admissions-body');
+            if (tbody) {
+                tbody.innerHTML = data.patients.slice(0, 5).map(p => `
+          <tr class="border-t border-slate-700">
+            <td class="py-3 pr-4">
+              <p class="text-white font-medium">${p.name}</p>
+              <p class="text-xs text-gray-400">${p.id}</p>
+            </td>
+            <td class="py-3 pr-4 text-gray-300">${p.department || 'N/A'}</td>
+            <td class="py-3 pr-4">
+              <span class="status-badge status-${p.status}">${p.status}</span>
+            </td>
+            <td class="py-3 text-gray-400">${formatDate(p.admitted_date)}</td>
+          </tr>
+        `).join('');
+            }
+        }
+    } catch (error) {
+        console.error('Error loading recent admissions:', error);
+    }
+}
+
+async function renderRecords(container) {

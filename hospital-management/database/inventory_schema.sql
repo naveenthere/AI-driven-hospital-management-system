@@ -1,0 +1,35 @@
+DROP TABLE IF EXISTS donors;
+DROP TABLE IF EXISTS blood_stock;
+DROP TABLE IF EXISTS organ_stock;
+
+-- Blood Stock Table
+CREATE TABLE blood_stock (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    blood_type VARCHAR(5) NOT NULL UNIQUE,
+    units INT NOT NULL DEFAULT 0,
+    donors INT NOT NULL DEFAULT 0,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Organ Stock Table
+CREATE TABLE organ_stock (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    organ_type VARCHAR(50) NOT NULL UNIQUE,
+    available INT NOT NULL DEFAULT 0,
+    waitlist INT NOT NULL DEFAULT 0,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Donors Table
+CREATE TABLE donors (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    contact VARCHAR(20),
+    address VARCHAR(255),
+    donation_type ENUM('Blood', 'Organ') NOT NULL,
+    blood_group VARCHAR(5),
+    organ_type VARCHAR(50),
+    last_donation DATE,
+    status VARCHAR(50) DEFAULT 'Eligible',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

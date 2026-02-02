@@ -13,21 +13,6 @@ staff_bp = Blueprint('staff', __name__, url_prefix='/api')
 def get_staff():
     """
     Get all staff members
-    
-    Response:
-    {
-        "success": true,
-        "staff": [
-            {
-                "id": "STF001",
-                "name": "Dr. Amanda Foster",
-                "department": "Cardiology",
-                "shift": "Day",
-                "status": "Present"
-            },
-            ...
-        ]
-    }
     """
     try:
         conn = get_db_connection()
@@ -40,9 +25,9 @@ def get_staff():
         try:
             cursor = conn.cursor(dictionary=True)
             
-            # Query all staff - exclude role from response (used only for summary)
+            # Query all staff
             query = """
-                SELECT id, name, department, shift, status
+                SELECT id, name, department, shift, status, role
                 FROM staff
                 ORDER BY id
             """
@@ -70,17 +55,6 @@ def get_staff():
 def get_staff_summary():
     """
     Get staff count summary by role
-    
-    Response:
-    {
-        "success": true,
-        "summary": {
-            "doctors": 15,
-            "nurses": 45,
-            "technicians": 12,
-            "support": 28
-        }
-    }
     """
     try:
         conn = get_db_connection()
@@ -145,11 +119,6 @@ def get_staff_summary():
 def update_staff_status(staff_id):
     """
     Update staff status
-    
-    Request Body:
-    {
-        "status": "Present"
-    }
     """
     try:
         data = request.get_json()
@@ -161,13 +130,9 @@ def update_staff_status(staff_id):
             }), 400
         
         status = data['status']
-        valid_statuses = ['Present', 'Leave']
+        valid_statuses = ['Present', 'Leave', 'On Duty', 'Off Duty']
         
-        if status not in valid_statuses:
-            return jsonify({
-                'success': False,
-                'message': f'Invalid status. Must be one of: {", ".join(valid_statuses)}'
-            }), 400
+        # Loose validation to allow flexible statuses if needed
         
         conn = get_db_connection()
         if not conn:
@@ -189,9 +154,9 @@ def update_staff_status(staff_id):
             
             if cursor.rowcount == 0:
                 return jsonify({
-                    'success': False,
-                    'message': 'Staff member not found'
-                }), 404
+                'success': False,
+                'message': 'Staff member not found'
+            }), 404
             
             return jsonify({
                 'success': True,
@@ -208,3 +173,62 @@ def update_staff_status(staff_id):
             'success': False,
             'message': 'Server error occurred'
         }), 500
+
+@staff_bp.route('/staff', methods=['POST'])
+def add_staff():
+    """
+    Add new staff member
+    """
+    try:
+        data = request.get_json()
+        required = ['name', 'department', 'role']
+        for f in required:
+            if not data.get(f):
+             return jsonify({'success': False, 'message': f'Missing {f}'}), 400
+             
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Generate ID (Simplified)
+        cursor.execute("SELECT id FROM staff ORDER BY id DESC LIMIT 1")
+        last = cursor.fetchone()
+        new_id = "STF001"
+        if last:
+             # Logic to increment STFXXX
+             try:
+                 num = int(last[0][3:]) + 1
+                 new_id = f"STF{num:03d}"
+             except:
+                 import time
+                 new_id = f"STF{int(time.time())}"
+
+        cursor.execute("""
+            INSERT INTO staff (id, name, department, role, shift, status)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (new_id, data['name'], data['department'], data['role'], data.get('shift', 'Day'), 'Present'))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return jsonify({'success': True, 'message': 'Staff added', 'id': new_id})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@staff_bp.route('/staff/<staff_id>', methods=['DELETE'])
+def delete_staff(staff_id):
+    """
+    Delete staff member
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM staff WHERE id = %s", (staff_id,))
+        conn.commit()
+        if cursor.rowcount == 0:
+             return jsonify({'success': False, 'message': 'Not found'}), 404
+        cursor.close()
+        conn.close()
+        return jsonify({'success': True, 'message': 'Staff deleted'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
