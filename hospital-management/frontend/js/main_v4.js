@@ -38,9 +38,9 @@ document.addEventListener('DOMContentLoaded', loadTasks);
 const users = {
   'CEO001': { password: 'ceo@123', role: 'CEO', name: 'Dr. Sarah Johnson', access: ['dashboard', 'patients', 'staff', 'transactions', 'predictions', 'inventory', 'records'] },
   'CFO001': { password: 'cfo@123', role: 'CFO', name: 'Michael Chen', access: ['transactions'] },
-  'CNO001': { password: 'cno@123', role: 'CNO', name: 'Emily Davis', access: ['patients', 'staff'] },
-  'CMO001': { password: 'cmo@123', role: 'CMO', name: 'Dr. Robert Williams', access: ['inventory'] },
-  'PRM001': { password: 'prm@123', role: 'PRM', name: 'David Thompson', access: ['records'] },
+  'CNO001': { password: 'cno@123', role: 'CNO', name: 'Emily Davis', access: ['patients', 'staff', 'records'] },
+  'CMO001': { password: 'cmo@123', role: 'CMO', name: 'Dr. Robert Williams', access: ['dashboard', 'patients', 'staff', 'inventory', 'records'] },
+  'MRM001': { password: 'mrm@123', role: 'MRM', name: 'David Thompson', access: ['records'] },
   'HR001': { password: 'hr@123', role: 'HR', name: 'Human Resources Manager', access: ['staff', 'dashboard'] }
 };
 
@@ -123,7 +123,10 @@ function formatCurrency(amount) {
 }
 
 function formatDate(date) {
-  return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  if (!date) return 'N/A';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return 'N/A';
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function generateId(prefix) {
@@ -145,11 +148,16 @@ function showToast(message, type = 'success') {
 
 // ============ API FUNCTIONS ============
 async function loadPatientsData() {
+  console.log('[loadPatientsData] Starting...');
   try {
     const response = await fetch('/api/patients');
+    console.log('[loadPatientsData] Response received:', response.status);
     const data = await response.json();
+    console.log('[loadPatientsData] Data parsed:', data);
     if (data.success) {
       patientsData = data.patients;
+      console.log('[loadPatientsData] Loaded', patientsData.length, 'patients');
+      console.log('[loadPatientsData] First patient:', patientsData[0]);
     } else {
       console.error('Failed to load patients:', data.message);
     }
@@ -421,7 +429,6 @@ function renderLoginPage() {
                   <option value="CFO001">CFO - Chief Financial Officer</option>
                   <option value="CNO001">CNO - Chief Nursing Officer</option>
                   <option value="CMO001">CMO - Chief Medical Officer</option>
-                  <option value="CCO001">CCO - Chief Compliance Officer</option>
                   <option value="MRM001">MRM - Medical Record Manager</option>
                   <option value="HR001">HR - Human Resources Manager</option>
                 </select>
@@ -559,7 +566,7 @@ function renderMainLayout() {
       `;
 }
 
-function renderCurrentPage() {
+async function renderCurrentPage() {
   const content = document.getElementById('main-content');
   const title = document.getElementById('page-title');
 
@@ -575,9 +582,10 @@ function renderCurrentPage() {
 
   title.textContent = pageTitles[currentPage] || 'Dashboard';
 
+  // Check permissions using the robust hasAccess function (matches sidebar logic)
   if (!hasAccess(currentPage)) {
     content.innerHTML = `
-          <div class="h-full flex items-center justify-center">
+          <div class="flex items-center justify-center h-full">
             <div class="text-center">
               <div class="text-6xl mb-4">🔒</div>
               <h3 class="text-2xl font-semibold text-white mb-2">Access Denied</h3>
@@ -590,31 +598,50 @@ function renderCurrentPage() {
   }
 
   switch (currentPage) {
-    case 'dashboard': renderDashboard(content); break;
-    case 'patients': renderPatients(content); break;
-    case 'staff': renderStaff(content); break;
+    case 'dashboard': await renderDashboard(content); break;
+    case 'patients': await renderPatients(content); break;
+    case 'staff': await renderStaff(content); break;
     case 'transactions': renderTransactions(content); break;
     case 'predictions': renderPredictions(content); break;
     case 'inventory': renderInventory(content); break;
     case 'records': renderRecords(content); break;
-    default: renderDashboard(content);
+    default: await renderDashboard(content);
   }
 }
 
-function renderDashboard(container) {
-  const totalBeds = 200;
-  const occupiedBeds = 156;
-  const occupancyRate = ((occupiedBeds / totalBeds) * 100).toFixed(1);
+async function renderDashboard(container) {
+  console.log('[renderDashboard] Starting... patientsData length:', patientsData.length);
+  // Load necessary data
+  await loadPatientsData();
+  console.log('[renderDashboard] After loadPatientsData, length:', patientsData.length);
+  await loadStaffData();
+  const bedStatus = await loadBedStatus();
+
+  // Calculate metrics from real data
+  const totalBeds = bedStatus.reduce((sum, b) => sum + Number(b.total_beds), 0) || 200;
+  const occupiedBeds = bedStatus.reduce((sum, b) => sum + Number(b.occupied_beds), 0) || 156;
+  const occupancyRate = totalBeds > 0 ? ((occupiedBeds / totalBeds) * 100).toFixed(1) : 0;
+
+  // Use sample data for financial metrics (can be replaced with API later)
   const totalRevenue = sampleTransactions.filter(t => t.amount > 0).reduce((a, b) => a + b.amount, 0);
   const totalExpenses = Math.abs(sampleTransactions.filter(t => t.amount < 0).reduce((a, b) => a + b.amount, 0));
   const profit = totalRevenue - totalExpenses;
+
   const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   const criticalPatients = patientsData.filter(p => p.status === 'critical').length;
-  const icuOccupancy = 18;
-  const icuTotal = 20;
-  const emergencyWaiting = 7;
-  const surgeriesScheduled = 5;
+
+  // Use real ICU occupancy if available, else use defaults
+  const icuData = bedStatus.find(b => b.ward_type === 'ICU');
+  const icuOccupancy = icuData ? icuData.occupied_beds : 18;
+  const icuTotal = icuData ? icuData.total_beds : 20;
+
+  const emergencyWaiting = 7; // TODO: Connect to real API
+  const surgeriesScheduled = 5; // TODO: Connect to real API
   const lowStockBlood = sampleBloodStock.filter(b => b.units < 25).length;
+
+  // Count today's admissions
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayAdmissions = patientsData.filter(p => p.admittedDate === todayStr).length;
 
   container.innerHTML = `
         <!-- Real-time Status Bar -->
@@ -651,7 +678,8 @@ function renderDashboard(container) {
               <span class="text-blue-400 text-sm font-medium">Today</span>
             </div>
             <h3 class="text-gray-400 text-sm">Patient Admissions</h3>
-            <p class="text-2xl font-bold text-white">${patientsData.filter(p => p.admittedDate === '2024-01-15').length}</p>
+            <p class="text-2xl font-bold text-white">${todayAdmissions}</p>
+            <p class="text-xs text-gray-500 mt-1">${patientsData.filter(p => p.status === 'critical').length} critical, ${patientsData.filter(p => p.status === 'admitted').length} stable</p>
             <p class="text-xs text-gray-500 mt-1">3 critical, 2 stable</p>
           </div>
 
@@ -661,7 +689,7 @@ function renderDashboard(container) {
               <span class="text-purple-400 text-sm font-medium">Active</span>
             </div>
             <h3 class="text-gray-400 text-sm">Staff on Duty</h3>
-            <p class="text-2xl font-bold text-white">${sampleStaff.filter(s => s.status === 'Present').length}</p>
+            <p class="text-2xl font-bold text-white">${staffData.filter(s => s.status === 'Present').length}</p>
             <p class="text-xs text-gray-500 mt-1">Ratio: 1:4 (Staff:Patient)</p>
           </div>
 
@@ -753,26 +781,17 @@ function renderDashboard(container) {
                     <th class="pb-3">Date</th>
                   </tr>
                 </thead>
-                <tbody>
-                  ${patientsData.map(p => `
-                    <tr class="border-t border-slate-700">
-                      <td class="py-3 pr-4">
-                        <p class="text-white font-medium">${p.name}</p>
-                        <p class="text-xs text-gray-400">${p.id}</p>
-                      </td>
-                      <td class="py-3 pr-4 text-gray-300">${p.department}</td>
-                      <td class="py-3 pr-4">
-                        <span class="status-badge status-${p.status}">${p.status}</span>
-                      </td>
-                      <td class="py-3 text-gray-400">${formatDate(p.admittedDate)}</td>
-                    </tr>
-                  `).join('')}
+                <tbody id="recent-admissions-tbody">
+                  <tr><td colspan="4" class="py-3 text-center text-gray-400">Loading...</td></tr>
                 </tbody>
               </table>
             </div>
           </div>
         </div>
       `;
+
+  console.log('[renderDashboard] HTML set, patientsData length:', patientsData.length);
+  console.log('[renderDashboard] First 3 patients:', patientsData.slice(0, 3));
 
   // Render charts
   setTimeout(() => {
@@ -837,6 +856,49 @@ function renderDashboard(container) {
       showlegend: false
     }, { responsive: true });
   }, 100);
+
+  // Populate Recent Admissions table after data is loaded
+  setTimeout(async () => {
+    const tbody = document.getElementById('recent-admissions-tbody');
+    // Force fresh fetch to avoid any state issues
+    try {
+      const debugRes = await fetch('/api/patients?t=' + Date.now());
+      const debugData = await debugRes.json();
+      const freshPatients = debugData.patients || [];
+
+      if (tbody && freshPatients.length > 0) {
+        tbody.innerHTML = freshPatients.slice(0, 5).map(p => {
+          // Debugging logic: Try multiple keys
+          const dateVal = p.admittedDate || p.admitted_date || p.date || p.admission_date;
+          let dateDisplay = formatDate(dateVal);
+
+          // If still N/A, show the raw value and keys for debugging
+          if (dateDisplay === 'N/A') {
+            dateDisplay = `<span class="text-xs text-red-500">RAW: ${JSON.stringify(dateVal)} KEYS: ${Object.keys(p).join(',').substring(0, 20)}...</span>`;
+          }
+
+          return `
+            <tr class="border-t border-slate-700">
+              <td class="py-3 pr-4">
+                <p class="text-white font-medium">${p.name}</p>
+                <p class="text-xs text-gray-400">${p.id}</p>
+              </td>
+              <td class="py-3 pr-4 text-gray-300">${p.department}</td>
+              <td class="py-3 pr-4">
+                <span class="${p.status === 'critical' ? 'text-red-400 bg-red-400/10' : p.status === 'discharged' ? 'text-green-400 bg-green-400/10' : p.status === 'transferred' ? 'text-yellow-400 bg-yellow-400/10' : 'text-blue-400 bg-blue-400/10'} px-2 py-1 rounded text-xs font-medium uppercase tracking-wide">${p.status}</span>
+              </td>
+              <td class="py-3 text-gray-400">${dateDisplay}</td>
+            </tr>
+          `;
+        }).join('');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4">No data found in fresh fetch</td></tr>';
+      }
+    } catch (e) {
+      console.error("Debug fetch failed", e);
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-red-500">Error: ${e.message}</td></tr>`;
+    }
+  }, 200);
 }
 
 // Helper function to render patient table rows
@@ -909,6 +971,7 @@ async function renderPatients(container) {
                   <th class="pb-3 pr-4">Department</th>
                   <th class="pb-3 pr-4">Doctor</th>
                   <th class="pb-3 pr-4">Nurse</th>
+                  <th class="pb-3 pr-4">Status</th>
                   <th class="pb-3 pr-4">Admitted Date</th>
                   <th class="pb-3 pr-4">Transferred Date</th>
                   <th class="pb-3">Discharged Date</th>
@@ -928,6 +991,14 @@ async function renderPatients(container) {
                     <td class="py-3 pr-4 text-gray-300">${p.department}</td>
                     <td class="py-3 pr-4 text-blue-300">${p.doctor}</td>
                     <td class="py-3 pr-4 text-purple-300">${p.nurse}</td>
+                    <td class="py-3 pr-4">
+                      <select class="patient-status-select px-3 py-1 rounded-lg bg-slate-700 text-sm border-none ${p.status === 'critical' ? 'text-red-400' : p.status === 'discharged' ? 'text-green-400' : p.status === 'transferred' ? 'text-yellow-400' : 'text-blue-400'}" data-patient-id="${p.id}">
+                        <option value="admitted" ${p.status === 'admitted' ? 'selected' : ''} class="text-blue-400">Admitted</option>
+                        <option value="critical" ${p.status === 'critical' ? 'selected' : ''} class="text-red-400">Critical</option>
+                        <option value="transferred" ${p.status === 'transferred' ? 'selected' : ''} class="text-yellow-400">Transferred</option>
+                        <option value="discharged" ${p.status === 'discharged' ? 'selected' : ''} class="text-green-400">Discharged</option>
+                      </select>
+                    </td>
                     <td class="py-3 pr-4 text-gray-300">${formatDate(p.admittedDate)}</td>
                     <td class="py-3 pr-4">
                       <input type="date" value="${p.transferredDate || ''}" 
@@ -999,7 +1070,16 @@ async function renderPatients(container) {
                   <input type="tel" name="phone" class="w-full px-4 py-2 rounded-lg input-field" required>
                 </div>
               </div>
-              <div class="grid grid-cols-2 gap-4">
+              <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-2">Status</label>
+                    <select name="status" class="w-full px-4 py-2 rounded-lg input-field">
+                        <option value="admitted">Admitted</option>
+                        <option value="critical">Critical</option>
+                        <option value="transferred">Transferred</option>
+                        <option value="discharged">Discharged</option>
+                    </select>
+                </div>
                 <div>
                   <label class="block text-sm text-gray-400 mb-2">Assigned Doctor</label>
                   <input type="text" name="doctor" placeholder="Dr. Name" class="w-full px-4 py-2 rounded-lg input-field" required>
@@ -1041,7 +1121,9 @@ async function renderPatients(container) {
       department: formData.get('department'),
       doctor: formData.get('doctor'),
       nurse: formData.get('nurse'),
-      status: 'admitted',
+      doctor: formData.get('doctor'),
+      nurse: formData.get('nurse'),
+      status: formData.get('status') || 'admitted',
       admittedDate: new Date().toISOString().split('T')[0],
       transferredDate: null,
       dischargedDate: null
@@ -1140,6 +1222,52 @@ async function renderPatients(container) {
           patient.status = newDate ? 'discharged' : patient.status;
           showToast(`Discharge date ${newDate ? 'updated' : 'cleared'} for ${patient.name}`);
         }
+      }
+    });
+  });
+
+  // Patient status change functionality (NEW)
+  document.querySelectorAll('.patient-status-select').forEach(select => {
+    select.addEventListener('change', async (e) => {
+      const patientId = e.target.dataset.patientId;
+      const newStatus = e.target.value;
+      const oldStatus = patientsData.find(p => p.id === patientId)?.status;
+
+      // Update styling immediately
+      e.target.className = `patient-status-select px-3 py-1 rounded-lg bg-slate-700 text-sm border-none ${newStatus === 'critical' ? 'text-red-400' : newStatus === 'discharged' ? 'text-green-400' : newStatus === 'transferred' ? 'text-yellow-400' : 'text-blue-400'}`;
+
+      try {
+        const response = await fetch(`/api/patients/${patientId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            status: newStatus
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          showToast(`Status updated to ${newStatus}`);
+          // Update local data
+          const patient = patientsData.find(p => p.id === patientId);
+          if (patient) {
+            patient.status = newStatus;
+          }
+        } else {
+          showToast(data.message || 'Failed to update status', 'error');
+          // Revert styling
+          e.target.value = oldStatus;
+          e.target.className = `patient-status-select px-3 py-1 rounded-lg bg-slate-700 text-sm border-none ${oldStatus === 'critical' ? 'text-red-400' : oldStatus === 'discharged' ? 'text-green-400' : oldStatus === 'transferred' ? 'text-yellow-400' : 'text-blue-400'}`;
+        }
+      } catch (error) {
+        console.error('Update status error:', error);
+        showToast('Unable to connect to server', 'error');
+        // Revert styling
+        e.target.value = oldStatus;
+        e.target.className = `patient-status-select px-3 py-1 rounded-lg bg-slate-700 text-sm border-none ${oldStatus === 'critical' ? 'text-red-400' : oldStatus === 'discharged' ? 'text-green-400' : oldStatus === 'transferred' ? 'text-yellow-400' : 'text-blue-400'}`;
       }
     });
   });
@@ -2480,7 +2608,7 @@ async function renderInventory(container) {
 
 }
 
-async function renderDashboard(container) {
+async function renderDashboard_DISABLED(container) {
   // Fetch metrics from API
   const metrics = await loadDashboardMetrics();
 
@@ -2630,7 +2758,7 @@ async function renderDashboard(container) {
   loadRecentAdmissions();
 }
 
-async function loadRecentAdmissions() {
+async function loadRecentAdmissions_DISABLED() {
   try {
     const response = await fetch('/api/patients');
     const data = await response.json();
@@ -3503,3 +3631,58 @@ async function initializeApp() {
 
 // Start the application
 initializeApp();
+
+// ============ RECENT ADMISSIONS ============
+async function loadRecentAdmissions() {
+  const tbody = document.getElementById('recent-admissions-tbody');
+  if (!tbody) {
+    console.error('recent-admissions-tbody not found');
+    return;
+  }
+
+  tbody.innerHTML = '<tr><td colspan="4" class="py-3 text-center text-gray-400">Loading recent data...</td></tr>';
+
+  try {
+    // Fresh fetch to ensure data is up-to-date
+    console.log('[loadRecentAdmissions] Fetching fresh data...');
+    const response = await fetch('/api/patients?t=' + Date.now());
+    const data = await response.json();
+
+    if (data.success && data.patients && data.patients.length > 0) {
+      console.log('[loadRecentAdmissions] Loaded', data.patients.length, 'patients');
+
+      tbody.innerHTML = data.patients.slice(0, 5).map(p => {
+        // Robust Date Handling
+        const dateVal = p.admittedDate || p.admitted_date || p.date || p.admission_date;
+        let dateDisplay = formatDate(dateVal);
+
+        // Debug fallback
+        if (dateDisplay === 'N/A') {
+          console.warn('Date N/A for', p.name, 'Val:', dateVal);
+          // Force show raw value if N/A
+          dateDisplay = `<span class="text-xs text-red-500" title="Raw: ${dateVal}">RAW: ${dateVal}</span>`;
+        }
+
+        return `
+          <tr class="border-t border-slate-700">
+            <td class="py-3 pr-4">
+              <p class="text-white font-medium">${p.name}</p>
+              <p class="text-xs text-gray-400">${p.id}</p>
+            </td>
+            <td class="py-3 pr-4 text-gray-300">${p.department || 'General'}</td>
+            <td class="py-3 pr-4">
+              <span class="${p.status === 'critical' ? 'text-red-400 bg-red-400/10' : p.status === 'discharged' ? 'text-green-400 bg-green-400/10' : p.status === 'transferred' ? 'text-yellow-400 bg-yellow-400/10' : 'text-blue-400 bg-blue-400/10'} px-2 py-1 rounded text-xs font-medium uppercase tracking-wide">${p.status}</span>
+            </td>
+            <td class="py-3 text-gray-400">${dateDisplay}</td>
+          </tr>
+        `;
+      }).join('');
+    } else {
+      tbody.innerHTML = '<tr><td colspan="4" class="py-3 text-center text-gray-400">No recent admissions found</td></tr>';
+    }
+  } catch (error) {
+    console.error('Error loading recent admissions:', error);
+    tbody.innerHTML = `<tr><td colspan="4" class="py-3 text-center text-red-400">Error loading data: ${error.message}</td></tr>`;
+  }
+}
+

@@ -8,9 +8,9 @@ import sys
 import os
 from datetime import datetime
 
-# Add parent directory to path to import db_config
+# Add parent directory to path to import config
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from db_config import get_db_connection
+from config import get_db_connection
 
 # Create blueprint
 patients_bp = Blueprint('patients', __name__, url_prefix='/api')

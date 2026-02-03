@@ -7,157 +7,17 @@
     <title>MedCare Hospital Management System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-    <script src="/_sdk/element_sdk.js"></script>
-    <script src="/_sdk/data_sdk.js"></script>
     <link
         href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@700&display=swap"
         rel="stylesheet">
-    <style>
-        body {
-            box-sizing: border-box;
-            font-family: 'Poppins', sans-serif;
-        }
-
-        .playfair {
-            font-family: 'Playfair Display', serif;
-        }
-
-        .gradient-bg {
-            background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
-        }
-
-        .glass {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .card-hover {
-            transition: all 0.3s ease;
-        }
-
-        .card-hover:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-        }
-
-        .pulse-alert {
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-
-            0%,
-            100% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.5;
-            }
-        }
-
-        .sidebar-item {
-            transition: all 0.2s ease;
-        }
-
-        .sidebar-item:hover {
-            background: rgba(59, 130, 246, 0.2);
-            transform: translateX(5px);
-        }
-
-        .sidebar-item.active {
-            background: rgba(59, 130, 246, 0.3);
-            border-left: 3px solid #3b82f6;
-        }
-
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: #1e293b;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: #3b82f6;
-            border-radius: 4px;
-        }
-
-        .table-container {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .status-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-
-        .status-admitted {
-            background: #22c55e20;
-            color: #22c55e;
-        }
-
-        .status-discharged {
-            background: #ef444420;
-            color: #ef4444;
-        }
-
-        .status-transferred {
-            background: #f59e0b20;
-            color: #f59e0b;
-        }
-
-        .status-critical {
-            background: #dc262620;
-            color: #dc2626;
-        }
-
-        .input-field {
-            background: rgba(30, 41, 59, 0.8);
-            border: 1px solid rgba(59, 130, 246, 0.3);
-            color: white;
-        }
-
-        .input-field:focus {
-            border-color: #3b82f6;
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
-        }
-
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #2563eb, #1d4ed8);
-        }
-
-        .modal-overlay {
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(5px);
-        }
-
-        .chart-container {
-            min-height: 300px;
-        }
-    </style>
-    <style>
-        @view-transition {
-            navigation: auto;
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 
 <body class="h-full bg-slate-900 text-white overflow-auto">
     <div id="app" class="h-full"></div>
 
     <!-- External JavaScript file -->
-    <script src="{{ url_for('static', filename='main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main_v4.js') }}?v=4.2"></script>
 </body>
 
 </html>

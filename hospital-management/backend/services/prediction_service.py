@@ -12,7 +12,7 @@ from sklearn.metrics import mean_absolute_percentage_error
 import warnings
 warnings.filterwarnings('ignore')
 
-from prediction_config import (
+from ml.prediction_config import (
     FORECASTING_MODEL,
     ARIMA_ORDER,
     SARIMA_ORDER,
@@ -51,6 +51,19 @@ class ForecastingService:
         df['admission_date'] = pd.to_datetime(df['admission_date'])
         df = df.sort_values('admission_date')
         df = df.set_index('admission_date')
+        
+        # 1. Remove today's data first if it exists and is incomplete
+        today = pd.Timestamp(datetime.now().date())
+        if not df.empty and df.index[-1] >= today:
+             df = df.iloc[:-1]
+        
+        # 2. Resample to ensure daily frequency
+        df = df.resample('D').sum()
+        
+        # 3. Replace 0s (missing days) with interpolated values
+        # We replace 0s with NaN purely for interpolation purposes, then fill remaining NaNs with 0
+        df = df.replace(0, np.nan).interpolate(method='linear').fillna(0)
+             
         return df['total_admissions']
     
     def fit_model(self, time_series):
@@ -323,9 +336,66 @@ class ForecastingService:
             if hasattr(self, 'best_params'):
                  params_str = f"Optimized Order: {self.best_params['order']}, Seasonal: {self.best_params['seasonal_order']}"
             
+            
             return {
                 'type': 'SARIMA',
                 'name': 'SARIMA (Seasonal Time Series Forecast)',
                 'description': 'Seasonal Auto-Regressive Integrated Moving Average',
                 'parameters': params_str
             }
+            
+    def get_eda_data(self, df):
+        """
+        Prepare data for EDA visualization
+        """
+        # Raw data processing (similar to prepare_data but keeping more info)
+        df_processed = df.copy()
+        df_processed['admission_date'] = pd.to_datetime(df_processed['admission_date'])
+        df_processed = df_processed.set_index('admission_date')
+        
+        # 1. Remove today's data if incomplete
+        today = pd.Timestamp(datetime.now().date())
+        if not df_processed.empty and df_processed.index[-1] >= today:
+             df_processed = df_processed.iloc[:-1]
+        
+        # 2. Resample and Interpolate
+        df_daily = df_processed.resample('D').sum()
+        df_interpolated = df_daily.replace(0, np.nan).interpolate(method='linear').fillna(0)
+        
+        # 3. Weekly Pattern
+        df_interpolated['day_name'] = df_interpolated.index.day_name()
+        weekly_pattern = df_interpolated.groupby('day_name')['total_admissions'].mean()
+        # Sort by day order
+        days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        weekly_pattern = weekly_pattern.reindex(days_order).fillna(0)
+        
+        # 4. Prepare JSON response
+        dates = df_interpolated.index.strftime('%Y-%m-%d').tolist()
+        values = df_interpolated['total_admissions'].tolist()
+        
+        # Mark imputed values (where raw was 0 or missing but interpolated is > 0)
+        # Note: raw df_daily has 0s for missing days.
+        imputed_flags = []
+        raw_values = df_daily['total_admissions'].tolist()
+        for raw, interp in zip(raw_values, values):
+            imputed_flags.append(raw == 0 and interp > 0)
+            
+        return {
+            'time_series': {
+                'dates': dates,
+                'values': values,
+                'raw_values': raw_values,
+                'imputed': imputed_flags
+            },
+            'weekly_pattern': {
+                'days': days_order,
+                'values': weekly_pattern.tolist()
+            },
+            'statistics': {
+                'mean': float(round(np.mean(values), 2)),
+                'std': float(round(np.std(values), 2)),
+                'min': float(np.min(values)),
+                'max': float(np.max(values)),
+                'total_days': len(values)
+            }
+        }

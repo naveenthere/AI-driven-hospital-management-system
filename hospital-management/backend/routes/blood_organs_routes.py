@@ -2,9 +2,9 @@ from flask import Blueprint, jsonify, request
 import sys
 import os
 
-# Add backend directory to path to import db_config
+# Add backend directory to path to import config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from db_config import get_db_connection
+from config import get_db_connection
 
 inventory_bp = Blueprint('inventory', __name__)
 

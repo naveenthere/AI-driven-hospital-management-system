@@ -8,9 +8,9 @@ from datetime import datetime
 import sys
 import os
 
-# Add parent directory to path to import db_config
+# Add parent directory to path to import config
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from db_config import get_db_connection
+from config import get_db_connection
 
 finance_bp = Blueprint('finance', __name__)
 

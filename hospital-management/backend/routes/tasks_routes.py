@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from db_config import get_db_connection
+from config import get_db_connection
 from datetime import datetime
 
 tasks_bp = Blueprint('tasks', __name__, url_prefix='/api/tasks')

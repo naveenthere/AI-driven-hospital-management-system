@@ -4,9 +4,9 @@ Handles admission forecasting, anomaly detection, and insights
 """
 
 from flask import Blueprint, jsonify
-from db_config import get_db_connection
-from services.forecasting_service import ForecastingService
-from prediction_config import FORECAST_DAYS
+from config import get_db_connection
+from services.prediction_service import ForecastingService
+from ml.prediction_config import FORECAST_DAYS
 import pandas as pd
 from datetime import datetime, timedelta
 
@@ -70,7 +70,8 @@ def get_admission_predictions():
             forecast_result = forecasting_service.predict(FORECAST_DAYS)
             
             # Generate prediction dates
-            last_date = pd.to_datetime(historical_data[-1]['admission_date'])
+            # Use the last date from the prepared time series to ensure continuity
+            last_date = time_series.index[-1]
             prediction_dates = [(last_date + timedelta(days=i+1)).strftime('%Y-%m-%d') 
                                for i in range(FORECAST_DAYS)]
             
@@ -168,7 +169,7 @@ def get_anomalies():
             )
             
             # Add dates to anomalies
-            last_date = pd.to_datetime(historical_data[-1]['admission_date'])
+            last_date = time_series.index[-1]
             for anomaly in anomaly_result['anomalies']:
                 day_idx = anomaly['day_index']
                 anomaly['date'] = (last_date + timedelta(days=day_idx+1)).strftime('%Y-%m-%d')
@@ -238,7 +239,7 @@ def get_insights():
             forecast_result = forecasting_service.predict(FORECAST_DAYS)
             
             # Generate dates
-            last_date = pd.to_datetime(historical_data[-1]['admission_date'])
+            last_date = time_series.index[-1]
             prediction_dates = [(last_date + timedelta(days=i+1)).strftime('%Y-%m-%d') 
                                for i in range(FORECAST_DAYS)]
             
@@ -342,3 +343,37 @@ def get_metrics():
             'success': False,
             'message': 'Metrics calculation failed'
         }), 500
+
+
+@predictions_bp.route('/eda-data', methods=['GET'])
+def get_eda_data_endpoint():
+    """
+    Get data for EDA dashboard
+    """
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'success': False, 'message': 'Database connection failed'}), 500
+        
+        try:
+            cursor = conn.cursor(dictionary=True)
+            query = "SELECT admission_date, total_admissions FROM daily_admissions ORDER BY admission_date ASC"
+            cursor.execute(query)
+            historical_data = cursor.fetchall()
+            
+            if not historical_data:
+                return jsonify({'success': False, 'message': 'No data found'}), 404
+                
+            df = pd.DataFrame(historical_data)
+            forecasting_service = ForecastingService()
+            eda_data = forecasting_service.get_eda_data(df)
+            
+            return jsonify({'success': True, 'data': eda_data}), 200
+            
+        finally:
+            cursor.close()
+            conn.close()
+    
+    except Exception as e:
+        print(f"EDA Data error: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500

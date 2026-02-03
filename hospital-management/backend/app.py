@@ -15,7 +15,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Initialize Flask app with custom template and static folders
 app = Flask(__name__,
             template_folder=os.path.join(BASE_DIR, 'frontend', 'templates'),
-            static_folder=os.path.join(BASE_DIR, 'frontend', 'static'))
+            static_folder=os.path.join(BASE_DIR, 'frontend'),
+            static_url_path='')
 
 # Enable CORS for API endpoints (if needed in future)
 CORS(app)
@@ -49,6 +50,17 @@ def index():
 def predictions_test():
     """Test page for predictions module"""
     return render_template('predictions_test.html')
+
+@app.route('/test_dates.html')
+def test_dates():
+    """Test page for date formatting"""
+    return render_template('test_dates.html')
+
+
+@app.route('/eda')
+def eda_dashboard():
+    """EDA Dashboard for Data Science analysis"""
+    return render_template('eda_dashboard.html')
 
 
 
