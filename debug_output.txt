@@ -1,0 +1,56 @@
+--- 1. Fetching Data ---
+Total records: 93
+First record: {'admission_date': datetime.date(2025, 11, 1), 'total_admissions': 41}
+Last record: {'admission_date': datetime.date(2026, 2, 3), 'total_admissions': 1}
+
+Last 10 records from DB:
+   admission_date  total_admissions
+83     2026-01-23                57
+84     2026-01-24                53
+85     2026-01-25                40
+86     2026-01-26                45
+87     2026-01-27                49
+88     2026-01-28                51
+89     2026-01-29                54
+90     2026-01-30                56
+91     2026-01-31                52
+92     2026-02-03                 1
+
+--- 2. Preparing Data ---
+Time Series Head:
+admission_date
+2025-11-01    41
+2025-11-02    39
+2025-11-03    45
+2025-11-04    48
+2025-11-05    51
+Freq: D, Name: total_admissions, dtype: int64
+
+Time Series Tail:
+admission_date
+2026-01-27    49
+2026-01-28    51
+2026-01-29    54
+2026-01-30    56
+2026-01-31    52
+Freq: D, Name: total_admissions, dtype: int64
+
+Time Series Description:
+count    92.000000
+mean     46.815217
+std       6.685936
+min      28.000000
+25%      42.000000
+50%      48.000000
+75%      52.000000
+max      58.000000
+Name: total_admissions, dtype: float64
+
+--- 3. Fitting Model ---
+Model fitted successfully.
+Model Type: SARIMA
+Best Params: {'order': (2, 1, 1), 'seasonal_order': (1, 1, 1, 7)}
+
+--- 4. Forecasting ---
+Predictions:
+[40.58302821239735, 46.38501608078968, 50.62935416959631, 51.34047569195525, 52.352211020104974, 53.86247754728145, 52.4718729416602, 41.652865455781075, 47.23669292914012, 51.13153818494081, 51.607826952549104, 52.51794262040133, 54.00781671178183, 52.629061234342394]

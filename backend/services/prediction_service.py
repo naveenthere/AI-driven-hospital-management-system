@@ -57,6 +57,17 @@ class ForecastingService:
         if not df.empty and df.index[-1] >= today:
              df = df.iloc[:-1]
         
+        # 2. Remove trailing outlier/incomplete data
+        # Sometimes the last recorded day has partial data (e.g. 1 admission vs 50 avg)
+        # This causes the model to predict a crash to zero. We remove it if it's < 20% of recent average.
+        if not df.empty and len(df) >= 7:
+            last_val = df['total_admissions'].iloc[-1]
+            # Calculate average of previous 7 days (excluding the last one)
+            prev_avg = df['total_admissions'].iloc[-8:-1].mean()
+            
+            if prev_avg > 0 and last_val < 0.2 * prev_avg:
+                df = df.iloc[:-1]
+        
         # 2. Resample to ensure daily frequency
         df = df.resample('D').sum()
         
