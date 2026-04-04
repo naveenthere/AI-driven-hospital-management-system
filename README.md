@@ -1,115 +1,99 @@
-# MedCare AI - Hospital Management System 🏥
+# AI-Driven Hospital Management System 🏥
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Python](https://img.shields.io/badge/python-3.9%2B-blue)
-![Flask](https://img.shields.io/badge/flask-3.0-green)
-![Status](https://img.shields.io/badge/status-active-success)
+A robust, full-stack Hospital Management System equipped with Advanced Machine Learning Predictions and a Local, Private AI Chatbot powered by Ollama. 
 
-**MedCare AI** is a comprehensive, AI-driven Hospital Management System designed to modernize healthcare administration. It leverages machine learning (SARIMA/ARIMA) to predict patient admissions, optimize staff allocation, and manage critical resources like blood and organs.
+Designed to streamline operations, manage resources, and provide hospital executives with real-time, data-driven insights.
 
 ---
 
-## 🚀 Key Features
+## 🌟 Key Features
 
-*   **📊 Interactive Dashboard**: Real-time visualization of Bed Occupancy, Revenue, and Patient Demographics.
-*   **🤖 AI Predictions**: 
-    *   Forecast daily patient admissions for the next 14 days.
-    *   Detect anomalies in admission trends.
-    *   Generate automated insights for capacity planning.
-*   **🩺 Patient Flow**: manage admissions, discharges, and transfers efficiently.
-*   **👨‍⚕️ Staff Management**: Track doctor availability, shifts, and departmental resources.
-*   **🩸 Inventory Control**: Monitor Blood Bank and Organ availability with real-time tracking.
-*   **🔐 Role-Based Access Control (RBAC)**: Secure storage and views for CEO, CNO, CMO, and Medical Record Managers.
+### 1. **Complete Dashboard Hub**
+- **Patient Flow Management**: Track admissions, ward statuses, critical patients, and discharges.
+- **Resource & Inventory Management**: Monitor ICU beds, general wards, ventilators, and blood donor stocks.
+- **Finance & Staffing**: Track total income vs. expenses, un-processed payroll, and monitor staff attendance dynamically.
 
----
+### 2. **Machine Learning Predictions (SARIMA)**
+A state-of-the-art predictive module analyzing historical daily admission bounds to forecast the next 14 days of patient flow. 
+- Automatically identifies anomalous intake levels.
+- Smooths missing data using background statistical modeling.
+- Enables staff scaling before major surges occur.
 
-## 🛠️ Tech Stack
-
-### Backend
-*   **Framework**: Flask (Python)
-*   **Database**: MySQL
-*   **ML Libraries**: Statsmodels (SARIMA), Scikit-learn (Isolation Forest), Pandas, NumPy.
-*   **API**: RESTful architecture with Blueprints.
-
-### Frontend
-*   **Structure**: HTML5, Vanilla JavaScript (ES6+), CSS3.
-*   **Styling**: Custom CSS + TailwindCSS (CDN).
-*   **Visualization**: Plotly.js for interactive charts.
+### 3. **AI Executive Assistant (Local LLM Integration)**
+A fully private context-aware AI chatbot widget integrated directly into the dashboard.
+- Uses Meta's `llama3.2` model locally via **Ollama** ensuring **zero patient data** leaves the server.
+- Uses a robust Retrieval-Augmented Generation (RAG) pipeline: Extracts intents (Revenue, Stock, Staffing, Patient Info), queries the secure backend MySQL database, and delegates to the LLM to provide natural, conversational responses.
+- Enforces strict **Role-Based Access Control (RBAC)** — staff can only query information their credentials permit.
 
 ---
 
-## 📂 Project Structure
+## 🛠️ Technology Stack
 
-```bash
-Hospital-Management/
-├── backend/
-│   ├── app.py                  # Entry Point
-│   ├── config.py               # DB Configuration
-│   ├── routes/                 # API Endpoints (Auth, Patients, Predictions...)
-│   ├── services/               # Business Logic (Prediction Service)
-│   ├── ml/                     # ML Models & Analysis Scripts
-│   └── scripts/                # Maintenance Utilities
-│
-├── frontend/
-│   ├── templates/
-│   │   └── index.html          # Single Page Application Root
-│   ├── js/                     # Frontend Logic (main_v4.js)
-│   └── css/                    # Stylesheets
-│
-└── database/
-    ├── schema.sql              # Database Schema
-    └── seed_data.sql           # Demo Data
-```
+- **Frontend**: HTML5, CSS3 (Custom + Vanilla Tailwind-esque utility), Vanilla JavaScript (`app.py` served).
+- **Backend Server**: Python (Flask, Blueprint API architecture).
+- **Database**: MySQL (`hospital_management`).
+- **Machine Learning**: `pandas`, `statsmodels`, `scikit-learn` (SARIMA forecasting).
+- **Natural Language Processing**: `requests` (Ollama Local API integration).
 
 ---
 
-## ⚡ Getting Started
+## 🚀 Getting Started
+
+Follow these steps to run the application locally on your machine.
 
 ### Prerequisites
-*   Python 3.9+
-*   MySQL Server 8.0+
+- Python 3.10+
+- MySQL Server (XAMPP / MySQL Workbench)
+- [Ollama](https://ollama.com/) (For AI Chatbot Features)
 
-### Installation
+### 1. Database Setup
+1. Open MySQL Workbench or XAMPP phpMyAdmin.
+2. Create a new database named `hospital_management`.
+3. Import the system schema. 
 
-1.  **Clone the repository**
-    ```bash
-    git clone https://github.com/yourusername/medcare-ai.git
-    cd medcare-ai
-    ```
+### 2. Backend Setup
+1. Clone the repository and navigate into the project wrapper:
+   ```bash
+   git clone https://github.com/naveenthere/AI-driven-hospital-management-system.git
+   cd AI-driven-hospital-management-system/backend
+   ```
+2. Create a virtual environment and activate it:
+   ```bash
+   python -m venv .venv
+   # Windows (Powershell):
+   .\.venv\Scripts\Activate.ps1
+   # Mac/Linux:
+   source .venv/bin/activate
+   ```
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Verify your database connection in `config.py` (ensure your root password matches).
 
-2.  **Backend Setup**
-    ```bash
-    cd backend
-    pip install -r requirements.txt
-    ```
+### 3. Activating the AI Assistant (Ollama)
+For the chatbot widget to correctly process queries:
+1. Ensure Ollama is installed on your machine.
+2. Open a separate terminal and run:
+   ```bash
+   ollama run llama3.2
+   ```
+   *Note: This will download the lightweight language model. It requires at least 4GB to 8GB of RAM. The backend will fall back to safe error messages if Ollama is perfectly offline!*
 
-3.  **Database Configuration**
-    *   Create a MySQL database named `hospital_db`.
-    *   Import `database/schema.sql` and `database/seed_data.sql`.
-    *   Create a `.env` file in `backend/` (see `.env.example`):
-        ```env
-        DB_HOST=localhost
-        DB_USER=root
-        DB_PASSWORD=yourpassword
-        DB_NAME=hospital_db
-        ```
-
-4.  **Run the Application**
-    ```bash
-    # From backend directory
-    python app.py
-    ```
-    Visit `http://localhost:5000` in your browser.
+### 4. Running the Application
+From the `backend` folder, with your virtual environment active, run:
+```bash
+python app.py
+```
+**Access the dashboard at**: `http://localhost:5000`
 
 ---
 
-## 🧪 Machine Learning Details
-The system uses **SARIMA (Seasonal Auto-Regressive Integrated Moving Average)** to analyze historical daily admission data. 
-- **Training**: Auto-retrains on new data entry.
-- **Accuracy**: Calculates MAPE (Mean Absolute Percentage Error) for validation.
-- **EDA**: Includes an Exploratory Data Analysis module in `backend/ml/eda_analysis.py`.
+## 🔒 Demo Credentials
+Use these sample rolls to explore the Role-Based Access Control on the login screen:
+- **CEO**: `CEO001` / `ceo@123` *(Has Full Access + AI Assistant privileges)*
+- **CFO**: `CFO001` / `cfo@123` *(Has Finance Access)*
 
 ---
 
-## 📄 License
-This project is licensed under the MIT License - see the LICENSE file for details.
+*Project developed for modern, data-driven healthcare administration.*

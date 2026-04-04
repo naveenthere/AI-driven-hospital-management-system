@@ -47,7 +47,6 @@ def index():
     """Serve the main hospital management application"""
     return render_template('index.html')
 
-
 @app.route('/predictions-test')
 def predictions_test():
     """Test page for predictions module"""

@@ -41,7 +41,9 @@ class ChatService:
             response_text = "I'm not sure I understand. Could you rephrase that? I can help with Revenue, Patients, Inventory, and Staff."
             explanation = "Low confidence in intent detection."
         else:
-            response_text, explanation = self.execute_intent(intent, entities)
+            raw_response_text, explanation = self.execute_intent(intent, entities, query_text)
+            # Use Ollama to format the raw data beautifully
+            response_text = self.nlp.format_response(query_text, raw_response_text, user_role)
             
         # 4. Log Interaction
         self.log_interaction(user_id, user_role, query_text, intent, confidence, response_text, True)
@@ -53,24 +55,93 @@ class ChatService:
             "explanation": explanation
         }
 
-    def execute_intent(self, intent, entities):
+    def execute_intent(self, intent, entities, query_text):
         """
-        Mock executor for now. Connect to real services later.
+        Execute the detected intent against the active MySQL database.
         """
-        if intent == "GET_REVENUE":
-            return "$45,230 revenue generated today.", "Aggregated daily transactions from Finance Module."
+        import re
+        
+        try:
+            conn = get_db_connection()
+            if not conn:
+                return "Database connection failed.", "System error"
+                
+            cursor = conn.cursor(dictionary=True)
             
-        elif intent == "GET_PATIENT_COUNT":
-            return "There are 142 active patients admitted.", "Count of active records in 'admissions' table."
-            
-        elif intent == "GET_UNIT_AVAILABILITY":
-            return "ICU: 2 beds free. Ventilators: 4 available.", "Real-time query of 'resources' table."
-            
-        elif intent == "GET_STAFF_STATUS":
-            return "92% staff attendance. 3 nurses on leave.", "Shift data from 'staff_attendance' table."
-            
-        elif intent == "GET_PATIENT_DETAILS":
-            return "Patient John Doe (ID: 1023) is in Ward A, Bed 4. Condition: Stable.", "Lookup in 'medical_records' by Patient ID."
+            if intent == "GET_REVENUE":
+                cursor.execute("SELECT SUM(amount) as total FROM transactions WHERE amount > 0 AND DATE(date) = CURDATE()")
+                today_rev = cursor.fetchone()['total']
+                
+                if today_rev:
+                    response = f"Today's revenue is ${today_rev:,.2f}."
+                else:
+                    cursor.execute("SELECT SUM(amount) as total FROM transactions WHERE amount > 0")
+                    total_rev = cursor.fetchone()['total'] or 0
+                    response = f"No revenue recorded yet today. Total historical revenue is ${total_rev:,.2f}."
+                
+                cursor.close(); conn.close()
+                return response, "Live aggregated calculation from 'transactions' table."
+                
+            elif intent == "GET_PATIENT_COUNT":
+                cursor.execute("SELECT COUNT(*) as cnt FROM patients WHERE status IN ('admitted', 'critical')")
+                count = cursor.fetchone()['cnt']
+                cursor.close(); conn.close()
+                return f"There are currently {count} active patients admitted.", "Live count from 'patients' table."
+                
+            elif intent == "GET_UNIT_AVAILABILITY":
+                cursor.execute("SELECT COUNT(*) as free_icu FROM beds WHERE status != 'occupied' AND is_icu = 1")
+                free_icu = cursor.fetchone()['free_icu']
+                
+                cursor.execute("SELECT SUM(units) as total_blood FROM blood_stock")
+                blood_stock = cursor.fetchone()['total_blood'] or 0
+                
+                cursor.close(); conn.close()
+                return f"There are {free_icu} free ICU beds available, and {blood_stock} units of blood currently in stock.", "Live aggregation across 'beds' and 'blood_stock' tables."
+                
+            elif intent == "GET_STAFF_STATUS":
+                cursor.execute("SELECT COUNT(*) as total, SUM(CASE WHEN status='Present' THEN 1 ELSE 0 END) as present, SUM(CASE WHEN status='Leave' THEN 1 ELSE 0 END) as on_leave FROM staff")
+                stats = cursor.fetchone()
+                
+                cursor.close(); conn.close()
+                return f"Out of {stats['total']} total staff, {stats['present'] or 0} are present today and {stats['on_leave'] or 0} are on leave.", "Live state taken from 'staff' table."
+                
+            elif intent == "GET_PATIENT_DETAILS":
+                # Fallback Regex to find ADM IDs
+                id_match = re.search(r'\b(ADM\d{3,5})\b', query_text, re.IGNORECASE)
+                name_match = re.search(r'patient\s+([a-zA-Z\s]+)', query_text, re.IGNORECASE)
+                
+                if id_match:
+                    pid = id_match.group(1).upper()
+                    cursor.execute("SELECT name, department, doctor, status FROM patients WHERE id = %s", (pid,))
+                    patient = cursor.fetchone()
+                    if patient:
+                        response = f"Patient {patient['name']} ({pid}) is marked as '{patient['status']}' in the {patient['department']} department under {patient['doctor']}."
+                    else:
+                        response = f"I could not find a patient with ID {pid}."
+                    cursor.close(); conn.close()
+                    return response, "Live lookup in 'patients' table using extracted ID."
+                    
+                elif name_match:
+                    name = name_match.group(1).strip()
+                    # Skip common stopwords
+                    if name.lower() in ['details', 'info', 'record', 'count']:
+                         return "Please provide a specific Patient ID (e.g. ADM001).", "Needs specific ID"
+                         
+                    cursor.execute("SELECT id, name, department, doctor, status FROM patients WHERE name LIKE %s", (f"%{name}%",))
+                    patient = cursor.fetchone()
+                    if patient:
+                        response = f"Patient {patient['name']} (ID: {patient['id']}) is '{patient['status']}' in {patient['department']} under {patient['doctor']}."
+                    else:
+                        response = f"I could not find a patient matching the name '{name}'. Try using their ID (e.g., ADM001)."
+                    cursor.close(); conn.close()
+                    return response, "Live lookup in 'patients' table using extracted Name."
+                    
+                cursor.close(); conn.close()
+                return "Please specify the Patient ID (e.g., 'What is the status of ADM001?').", "Missing identifier in request."
+                
+        except Exception as e:
+            print(f"Error executing intent {intent}: {e}")
+            return "Sorry, I ran into an issue retrieving the data.", "Database error"
             
         return "Command executed.", "Logic placeholder."
 

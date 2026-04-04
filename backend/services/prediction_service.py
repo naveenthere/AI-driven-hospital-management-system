@@ -57,25 +57,39 @@ class ForecastingService:
         if not df.empty and df.index[-1] >= today:
              df = df.iloc[:-1]
         
-        # 2. Remove trailing outlier/incomplete data
-        # Sometimes the last recorded day has partial data (e.g. 1 admission vs 50 avg)
-        # This causes the model to predict a crash to zero. We remove it if it's < 20% of recent average.
-        if not df.empty and len(df) >= 7:
-            last_val = df['total_admissions'].iloc[-1]
-            # Calculate average of previous 7 days (excluding the last one)
-            prev_avg = df['total_admissions'].iloc[-8:-1].mean()
+        # 2. Strip the entire trailing run of near-zero / stale data.
+        # The DB may have a stretch of days with 0 or 1 admissions at the tail
+        # (e.g., partial data entry, system downtime). Training on this ramp-to-zero
+        # teaches the model that admissions are collapsing → predicts near-zero.
+        # Strategy: compute the "healthy" baseline from the most recent 30 good days,
+        # then drop every record at the tail that is below 20% of that baseline.
+        if len(df) >= 15:
+            # Use the middle 30 records (avoid polluting baseline with the bad tail)
+            baseline_slice = df['total_admissions'].iloc[-40:-10]
+            baseline_avg = baseline_slice[baseline_slice > 0].mean()
             
-            if prev_avg > 0 and last_val < 0.2 * prev_avg:
-                df = df.iloc[:-1]
+            if baseline_avg > 0:
+                threshold = 0.20 * baseline_avg
+                # Walk backwards and drop rows below threshold
+                cut_idx = len(df)
+                for i in range(len(df) - 1, max(len(df) - 30, -1), -1):
+                    if df['total_admissions'].iloc[i] < threshold:
+                        cut_idx = i
+                    else:
+                        break  # Stop as soon as we hit a valid data point
+                if cut_idx < len(df):
+                    print(f"Trimming {len(df) - cut_idx} trailing near-zero row(s) "
+                          f"(threshold={threshold:.1f}, baseline={baseline_avg:.1f})")
+                    df = df.iloc[:cut_idx]
         
-        # 2. Resample to ensure daily frequency
+        # 3. Resample to ensure daily frequency
         df = df.resample('D').sum()
         
-        # 3. Replace 0s (missing days) with interpolated values
-        # We replace 0s with NaN purely for interpolation purposes, then fill remaining NaNs with 0
-        df = df.replace(0, np.nan).interpolate(method='linear').fillna(0)
+        # 4. Replace 0s (missing days within the valid range) with interpolated values
+        df = df.replace(0, np.nan).interpolate(method='linear').bfill().fillna(0)
              
         return df['total_admissions']
+
     
     def fit_model(self, time_series):
         """

@@ -1,0 +1,23 @@
+# Virtual Environments
+venv/
+.venv/
+env/
+.env
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Temporary / Debug files
+*.txt
+!requirements.txt
+!README.md
+!db_schema.txt
+debug*.py
+diag_*.py
+verify_*.py
+
+# OS generated files
+.DS_Store
+Thumbs.db

@@ -3164,8 +3164,10 @@ function attachLoginEvents() {
 
     const user = users[userId];
     if (user && user.password === password) {
-      currentUser = user;
+      currentUser = { ...user, userId };
       currentPage = user.access[0];
+      // Persist user to localStorage so the AI Chat Widget can read role
+      localStorage.setItem('user', JSON.stringify({ userId, role: user.role, name: user.name }));
       showToast(`Welcome, ${user.name}!`);
       render();
     } else {
@@ -3200,6 +3202,7 @@ function attachMainEvents() {
   document.getElementById('logout-btn')?.addEventListener('click', () => {
     currentUser = null;
     currentPage = 'login';
+    localStorage.removeItem('user');  // Clear session for AI Chat Widget
     showToast('Logged out successfully');
     render();
   });
